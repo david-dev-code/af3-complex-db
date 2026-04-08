@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Complex – AF3-DB{% endblock %}
+
+{% block head_extra %}
+<style>
+  .copy-btn { cursor:pointer;font-size:.9rem; }
+  pre       { margin:0; }
+
+  .card-body pre{
+    overflow:auto;
+    padding-bottom:.5rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8">
+
+    <div class="border rounded p-3 mb-4 bg-light">
+      <h5 class="mb-3">How to prepare your upload</h5>
+
+      <div class="alert alert-info py-2 px-3 mb-4 small">
+        <strong>Best way for large Data:</strong>
+        Uploading massive files via the browser can be slow and unstable. For large uploads or a more stable connection, use the built-in CLI directly on the server:
+        <br><code class="fw-bold text-dark mt-1 d-inline-block">af3-db upload-folder /path/to/your/archives</code>
+      </div>
+
+      <div class="row mb-4">
+        <div class="col-md-6 border-end">
+          <h6 class="fw-bold text-primary">A: AlphaFold Server Output</h6>
+          <p class="small mb-2">
+            You can simply upload the <code>.zip</code> file exactly as you downloaded it from the AlphaFold Webserver.
+          </p>
+          <p class="small text-muted mb-0">
+            <em>Faster upload:</em> If the file is too large, extract it, delete the <code>msas/</code> and <code>templates/</code> folders, and zip it again.
+          </p>
+        </div>
+        <div class="col-md-6">
+          <h6 class="fw-bold text-success">B: Local AlphaFold Output</h6>
+          <p class="small mb-2">
+            Zip your entire result directory. Keep the <code>seed-*</code> folders included, as they are required to calculate mean ipTM and pTM score
+        </div>
+      </div>
+
+      <p class="small fw-semibold mb-2">Helper scripts to shrink & pack bundles:</p>
+      {% set snippets = [
+        ('Linux / macOS',
+         "zip -r my_complex.zip /path/to/af3_output -x '*/msas/*' '*/templates/*'"),
+
+        ('Windows',
+         "powershell -NoLogo -NoProfile -Command \"Get-ChildItem -Path 'C:\\path\\to\\af3_output' -Exclude 'msas','templates' | Compress-Archive -DestinationPath my_complex.zip -Force\"")
+      ] %}
+      {% for label, cmd in snippets %}
+      <div class="card mb-2">
+        <div class="card-header py-1 d-flex justify-content-between align-items-center">
+          <span class="small fw-semibold">{{ label }}</span>
+          <span class="copy-btn text-primary" data-code="{{ loop.index0 }}">📄 Copy</span>
+        </div>
+        <div class="card-body p-2">
+          <pre><code id="code{{ loop.index0 }}">{{ cmd }}</code></pre>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <form id="upload-form" enctype="multipart/form-data"
+          class="card p-4 bg-white shadow-sm">
+      <h2 class="h6 mb-3">Upload AlphaFold-3 Bundle</h2>
+
+      <div class="mb-3">
+        <label class="form-label" data-bs-toggle="tooltip" title="Your name, email, or user identifier for tracking purposes.">
+          Submitted from
+        </label>
+        <input type="text" name="submitted_from" class="form-control" required>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label" data-bs-toggle="tooltip" title="Provide a brief summary of the complex, e.g., 'Insulin Receptor with Ligand'.">
+            Description&nbsp;<small class="text-muted">(optional)</small>
+        </label>
+        <textarea name="description" rows="3"
+                  class="form-control"
+                  placeholder="Short description of this run …"></textarea>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label" data-bs-toggle="tooltip" title="Group multiple uploads into a named collection for easier bulk analysis.">
+            Collection name&nbsp;<small class="text-muted">(optional)</small>
+        </label>
+        <input type="text" name="collection_name"
+               class="form-control"
+               placeholder="e.g. MyProject">
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label fw-semibold" data-bs-toggle="tooltip" title="Choose how the system identifies proteins in your files.">
+            UniProt Mapping Strategy
+        </label>
+        <div class="d-flex gap-4 mb-2">
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="mapping_mode" id="modeAuto" value="auto" checked>
+            <label class="form-check-label" for="modeAuto" data-bs-toggle="tooltip" title="The system searches UniParc by sequence identity to find matching UniProt IDs automatically.">
+              Automatic (Sequence Search)
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="mapping_mode" id="modeFilename" value="filename">
+            <label class="form-check-label" for="modeFilename" data-bs-toggle="tooltip" title="Parse UniProt Accessions directly from the folder name using a custom pattern.">
+              Define via Filename
+            </label>
+          </div>
+        </div>
+
+        <div id="filename-pattern-container" class="collapse mt-2">
+          <div class="card card-body bg-light py-2">
+            <label class="form-label small mb-1" data-bs-toggle="tooltip" title="Define a pattern to extract IDs. Use {ChainID} as placeholder.">
+              Filename Pattern (Regex-like)
+            </label>
+            <input type="text"
+                   name="filename_pattern"
+                   id="filename_pattern_input"
+                   class="form-control form-control-sm font-monospace"
+                   placeholder="e.g. {A}_{B} for Q8VI56_P62068">
+            <div class="form-text small mb-2">
+              Use <code>{CHAIN_ID}</code> placeholders matching your complex chains.<br>
+              Example: For a folder named <code>Q12345_2m9-2</code> and chains A/B, use <code>{A}_{B}</code>.
+            </div>
+
+            <div class="form-check border-top pt-2">
+                <input class="form-check-input" type="checkbox" name="mapping_fallback_only" id="mappingFallbackOnly" value="true">
+                <label class="form-check-label small" for="mappingFallbackOnly" data-bs-toggle="tooltip"
+                       title="If checked: The system will NOT perform a sequence search if the filename mapping is successful. Sequence search only runs if the filename ID is invalid.">
+                    Use Auto-Search only as fallback?
+                </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Bundle (ZIP)</label>
+        <input type="file" name="bundle" class="form-control" accept=".zip" required>
+      </div>
+
+      <button type="submit" class="btn btn-primary">Upload</button>
+    </form>
+
+    <div class="mt-4">
+      <div class="progress" id="upload-progress" style="height:20px;display:none;">
+        <div class="progress-bar" id="upload-bar" role="progressbar" style="width:0%;">0%</div>
+      </div>
+
+      <div id="processing" class="d-flex align-items-center mt-3 d-none">
+        <div class="spinner-border spinner-border-sm text-secondary me-2" role="status"></div>
+        <span>Processed...</span>
+      </div>
+
+      <div id="upload-status" class="mt-2"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/third-party/ajax/libs/clipboard.js/2.0.11/clipboard.min.js"></script>
+<script>
+/* Initialize Bootstrap Tooltips */
+document.addEventListener("DOMContentLoaded", function(){
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+      return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+
+/* Copy buttons */
+document.querySelectorAll('.copy-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const idx = btn.dataset.code;
+    const txt = document.getElementById('code'+idx).innerText;
+    navigator.clipboard.writeText(txt)
+      .then(()=>btn.textContent="✓ Copied")
+      .catch(()=>alert("Copy failed"));
+    setTimeout(()=>btn.textContent="📄 Copy",1500);
+  });
+});
+
+/* Mapping Mode Toggle */
+const radioAuto  = document.getElementById('modeAuto');
+const radioFile  = document.getElementById('modeFilename');
+const patternBox = document.getElementById('filename-pattern-container');
+const patternInput = document.getElementById('filename_pattern_input');
+
+function updateMappingMode() {
+  if (radioFile.checked) {
+    if (window.bootstrap && window.bootstrap.Collapse) {
+        new bootstrap.Collapse(patternBox, { show: true });
+    } else {
+        patternBox.classList.add('show');
+    }
+    patternInput.required = true;
+  } else {
+    if (window.bootstrap && window.bootstrap.Collapse) {
+        new bootstrap.Collapse(patternBox, { hide: true });
+    } else {
+        patternBox.classList.remove('show');
+    }
+    patternInput.required = false;
+  }
+}
+
+radioAuto.addEventListener('change', updateMappingMode);
+radioFile.addEventListener('change', updateMappingMode);
+
+
+/* Upload progress */
+const form       = document.getElementById('upload-form');
+const progress   = document.getElementById('upload-progress');
+const bar        = document.getElementById('upload-bar');
+const processing = document.getElementById('processing');
+const statusBox  = document.getElementById('upload-status');
+
+function toggleSpinner(show){ processing.classList.toggle('d-none', !show); }
+
+form.addEventListener('submit', e=>{
+  e.preventDefault();
+  progress.style.display='none'; bar.style.width='0%'; bar.textContent='0%';
+  statusBox.innerHTML=''; toggleSpinner(false);
+
+  const data = new FormData(form);
+  const xhr  = new XMLHttpRequest();
+  xhr.open('POST','/api/v1/complexes/upload');
+
+  xhr.upload.onprogress = ev=>{
+    if(!ev.lengthComputable) return;
+    const pct=Math.round(ev.loaded/ev.total*100);
+    progress.style.display='block';
+    bar.style.width=pct+'%'; bar.textContent=pct+'%';
+    if(pct===100) toggleSpinner(true);
+  };
+
+  xhr.onload = ()=>{
+    toggleSpinner(false);
+    if(xhr.status===200){
+      const r=JSON.parse(xhr.responseText);
+      if(r.success){
+        statusBox.innerHTML=`<div class="alert alert-success">
+          Upload successful! Accession(s): ${r.accessions}</div>`;
+        setTimeout(()=>location.href='/',1200);
+      }else{
+        statusBox.innerHTML=`<div class="alert alert-danger">${r.detail}</div>`;
+      }
+    }else{
+      statusBox.innerHTML=`<div class="alert alert-danger">
+        Errors in evaluation – pay attention to correct form</div>`;
+    }
+  };
+
+  xhr.onerror = ()=>{
+    toggleSpinner(false);
+    statusBox.innerHTML=`<div class="alert alert-danger">Network error during upload</div>`;
+  };
+
+  xhr.send(data);
+});
+</script>
+{% endblock %}

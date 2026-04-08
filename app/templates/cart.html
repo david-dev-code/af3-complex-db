@@ -1,0 +1,593 @@
+{% extends "base.html" %}
+
+{% block title %}Selection Cart – AF3-DB{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="h4 mb-0">Selection Cart</h2>
+        <p class="text-muted mb-0" id="cart-status">Loading selection...</p>
+    </div>
+    
+    <div class="d-flex gap-2">
+         <button class="btn btn-outline-secondary btn-sm" onclick="clearCart()">
+            Empty Cart (Deselect All)
+         </button>
+    </div>
+</div>
+
+<div id="cart-actions" class="card p-3 mb-4 bg-light d-none">
+    <div class="row g-3 align-items-center">
+        <div class="col-auto fw-bold">Actions:</div>
+
+        <div class="col-auto">
+            <div class="btn-group">
+              <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                ⬇ Download Selection
+              </button>
+              <ul class="dropdown-menu">
+                <li><button class="dropdown-item" onclick="downloadCart('cif')">model.cif only</button></li>
+                <li><button class="dropdown-item" onclick="downloadCart('confidences')">confidences.json only</button></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><button class="dropdown-item" onclick="downloadCart('all')">Everything (ZIP)</button></li>
+              </ul>
+            </div>
+        </div>
+
+        <div class="col-auto">
+            <button class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalChangeColl">
+                📂 Move to Collection
+            </button>
+        </div>
+
+        <div class="col-auto ms-auto">
+             <button class="btn btn-outline-danger btn-sm" onclick="bulkDeleteFromDB()">
+                ⚠ DELETE Selected from DB
+             </button>
+        </div>
+    </div>
+</div>
+
+<div id="cart-stats-container"></div>
+
+<div id="cart-table-container">
+    <div class="text-center py-5">
+        <div class="spinner-border text-secondary" role="status"></div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalChangeColl" tabindex="-1">
+  <div class="modal-dialog">
+    <form class="modal-content" onsubmit="submitChangeCollection(event)">
+      <div class="modal-header">
+        <h5 class="modal-title">Move to Collection</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted">Add selected items to an existing collection or create a new one.</p>
+
+        <ul class="nav nav-tabs mb-3" id="collTabs" role="tablist">
+          <li class="nav-item">
+            <button class="nav-link active" id="tab-new" data-bs-toggle="tab" data-bs-target="#pane-new" type="button" role="tab">Create New</button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" id="tab-existing" data-bs-toggle="tab" data-bs-target="#pane-existing" type="button" role="tab">Existing</button>
+          </li>
+        </ul>
+
+        <div class="tab-content">
+          <div class="tab-pane fade show active" id="pane-new" role="tabpanel">
+              <div class="mb-3">
+                <label class="form-label">New Collection Name</label>
+                <input type="text" name="new_name" class="form-control" placeholder="e.g. My Favorites">
+              </div>
+          </div>
+
+          <div class="tab-pane fade" id="pane-existing" role="tabpanel">
+              <div class="mb-3">
+                <label class="form-label">Select Collection</label>
+                <select name="existing_id" class="form-select">
+                    <option value="">-- Choose --</option>
+                    {% for col in all_collections %}
+                       <option value="{{ col.id }}">{{ col.name }}</option>
+                    {% endfor %}
+                </select>
+              </div>
+          </div>
+        </div>
+
+        <hr>
+        <p class="small text-muted">
+            <i class="bi bi-info-circle"></i> Items will be moved from their current collection to the selected one.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/third-party/sortablejs-1.15.2/Sortable.min.js"></script>
+<script src="/static/third-party/chart.js-4.5.1/chart.js"></script>
+
+<script>
+// Global state
+const IDENTITY_COLS = ["accession", "genes", "proteins", "collection"];
+
+// State for offcanvas and header inputs
+let cartState = {
+    cols: [],
+    sort: "accession",
+    desc: false,
+    plddt_center: "",
+    plddt_chain: "",
+    custom_formula: "",
+    ipsae_pae: 10, ipsae_dist: 10,
+    ipsae_pae_2: 10, ipsae_dist_2: 10,
+    ipsae_pae_3: 10, ipsae_dist_3: 10
+};
+
+let speciesChart = null;
+let scatterChart = null;
+let removeDebounceTimer = null;
+
+let currentCartSpeciesData = [];
+let currentSpeciesFilter = 'all';
+
+/**
+ * Initiates the download of selected items.
+ * @param {string} part - The type of file to download ('cif', 'confidences', or 'all').
+ */
+function downloadCart(part) {
+    const accs = CartManager.getAll();
+    if(accs.length === 0) return alert("Cart is empty");
+
+    // Create and submit a hidden form
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = "/api/v1/complexes/bulk_download";
+    form.target = "_blank";
+
+    const inputAccs = document.createElement("input");
+    inputAccs.type = "hidden";
+    inputAccs.name = "accessions";
+    inputAccs.value = JSON.stringify(accs);
+    form.appendChild(inputAccs);
+
+    const inputPart = document.createElement("input");
+    inputPart.type = "hidden";
+    inputPart.name = "part";
+    inputPart.value = part;
+    form.appendChild(inputPart);
+
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+}
+
+/**
+ * Fetches and renders the cart table and statistics.
+ */
+async function loadCartTable() {
+    const accs = CartManager.getAll();
+    const containerTable = document.getElementById('cart-table-container');
+    const containerStats = document.getElementById('cart-stats-container');
+    const status = document.getElementById('cart-status');
+    const actions = document.getElementById('cart-actions');
+
+    if (accs.length === 0) {
+        status.textContent = "Your cart is empty.";
+        containerTable.innerHTML = `<div class="alert alert-info text-center mt-4">No items selected. <br><a href="/" class="alert-link">Go back to search</a></div>`;
+        containerStats.innerHTML = "";
+        actions.classList.add('d-none');
+        return;
+    }
+
+    status.textContent = `${accs.length} items selected.`;
+    actions.classList.remove('d-none');
+
+    const inputDl = document.getElementById('input-dl-accs');
+    if(inputDl) inputDl.value = JSON.stringify(accs);
+
+    try {
+        const payload = {
+            accessions: accs,
+            cols: cartState.cols.length > 0 ? cartState.cols : null,
+            sort: cartState.sort,
+            desc: cartState.desc,
+            plddt_center: cartState.plddt_center,
+            plddt_chain: cartState.plddt_chain,
+            custom_formula: cartState.custom_formula,
+            ipsae_pae: parseInt(cartState.ipsae_pae), ipsae_dist: parseInt(cartState.ipsae_dist),
+            ipsae_pae_2: parseInt(cartState.ipsae_pae_2), ipsae_dist_2: parseInt(cartState.ipsae_dist_2),
+            ipsae_pae_3: parseInt(cartState.ipsae_pae_3), ipsae_dist_3: parseInt(cartState.ipsae_dist_3),
+        };
+
+        const response = await fetch('/cart/render_table', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) throw new Error("Failed to load table");
+
+        const data = await response.json();
+
+        containerStats.innerHTML = data.stats_html;
+        renderCharts(data.chart_data);
+        containerTable.innerHTML = data.table_html;
+
+        initDynamicTableLogic();
+
+    } catch (e) {
+        console.error(e);
+        containerTable.innerHTML = `<div class="alert alert-danger">Error loading table: ${e.message}</div>`;
+    }
+}
+
+/**
+ * Renders the species and scatter charts based on provided data.
+ * @param {Object} chartData - The data objects containing species and scatter coordinates.
+ */
+function renderCharts(chartData) {
+    if (!chartData) return;
+
+    if (chartData.species) {
+        currentCartSpeciesData = chartData.species;
+        updateCartSpeciesChart();
+    }
+
+    const ctxScatter = document.getElementById('cartScatterChart');
+    if (ctxScatter && chartData.scatter && chartData.scatter.length > 0) {
+        if(scatterChart) scatterChart.destroy();
+        scatterChart = new Chart(ctxScatter, {
+              type: 'scatter',
+              data: {
+                  datasets: [{
+                      label: 'Complexes',
+                      data: chartData.scatter,
+                      backgroundColor: 'rgba(52, 152, 219, 0.6)',
+                      borderColor: 'rgba(52, 152, 219, 1)',
+                      pointRadius: 3
+                  }]
+              },
+              options: {
+                  responsive: true, maintainAspectRatio: false,
+                  scales: { x: { title: {display:true, text:'ipTM'}, min:0, max:1 }, y: { title: {display:true, text:'pTM'}, min:0, max:1 } },
+                  plugins: {
+                      legend: { display: false },
+                      tooltip: {
+                          callbacks: {
+                              label: function(ctx) {
+                                  const pt = ctx.raw;
+                                  return `${pt.acc}: ipTM ${pt.x.toFixed(2)}, pTM ${pt.y.toFixed(2)}`;
+                              }
+                          }
+                      }
+                  }
+              }
+          });
+    }
+}
+
+
+/**
+ * Hook for the table called by _results_table.html on applying columns.
+ * @param {Array<string>} selectedCols - The columns selected by the user.
+ */
+window.onUpdateCols = function(selectedCols) {
+    readOffcanvasInputs();
+
+    let oldOrder = cartState.cols.length > 0 ? cartState.cols : [...IDENTITY_COLS, "iptm", "ptm", "created", "chains"];
+    let kept = oldOrder.filter(c => IDENTITY_COLS.includes(c) || selectedCols.includes(c));
+    let added = selectedCols.filter(c => !oldOrder.includes(c));
+
+    cartState.cols = [...kept, ...added];
+
+    loadCartTable();
+
+    const el = document.getElementById('scoreCanvas');
+    if(el) bootstrap.Offcanvas.getInstance(el)?.hide();
+};
+
+/**
+ * Reads user inputs from the DOM into the global state.
+ */
+function readOffcanvasInputs() {
+    cartState.plddt_center = document.getElementById("plddt-center")?.value || "";
+    cartState.plddt_chain = document.getElementById("plddt-chain")?.value || "";
+    cartState.custom_formula = document.getElementById("custom-formula-input")?.value || "";
+
+    cartState.ipsae_pae = document.getElementById("ipsae_pae")?.value || 10;
+    cartState.ipsae_dist = document.getElementById("ipsae_dist")?.value || 10;
+
+    cartState.ipsae_pae_2 = document.getElementById("ipsae_pae_2")?.value || 10;
+    cartState.ipsae_dist_2 = document.getElementById("ipsae_dist_2")?.value || 10;
+
+    cartState.ipsae_pae_3 = document.getElementById("ipsae_pae_3")?.value || 10;
+    cartState.ipsae_dist_3 = document.getElementById("ipsae_dist_3")?.value || 10;
+}
+
+/**
+ * Initializes interactive logic for the dynamically loaded table.
+ */
+function initDynamicTableLogic() {
+    const container = document.getElementById('cart-table-container');
+
+    // Sync checkboxes
+    container.querySelectorAll('.cart-checkbox').forEach(cb => cb.checked = true);
+    const headerCb = document.getElementById('select-all-header');
+    if(headerCb) headerCb.checked = true;
+
+    // Apply button
+    const btnApply = document.getElementById("apply-cols");
+    if (btnApply) {
+        const newBtn = btnApply.cloneNode(true);
+        btnApply.parentNode.replaceChild(newBtn, btnApply);
+        newBtn.addEventListener("click", () => {
+            const checks = Array.from(document.querySelectorAll(".col-check:checked"));
+            let cols = checks.map(c => c.value);
+
+            document.querySelectorAll('.pair-row').forEach(row => {
+                if (row.querySelector('.pair-check')?.checked) {
+                    const metric = row.querySelector('.pair-check').dataset.metric;
+                    const c1 = row.querySelector('.pair-c1').value;
+                    const c2 = row.querySelector('.pair-c2').value;
+                    cols.push(`${metric}__${c1}__${c2}`);
+                }
+            });
+            if(window.onUpdateCols) window.onUpdateCols(cols);
+        });
+    }
+
+    // Reset button
+    const btnReset = document.getElementById("reset-cols");
+    if (btnReset) btnReset.addEventListener("click", () => {
+        cartState.cols = [];
+        loadCartTable();
+    });
+
+    // Pairwise plus
+    container.querySelectorAll('.pair-plus-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const target = document.querySelector(btn.dataset.target);
+            if (target) { target.classList.remove('d-none'); target.classList.add('d-flex'); btn.style.display = 'none'; }
+        });
+    });
+
+    // More ipSAEs button
+    const btnMore = document.getElementById("btn-more-ipsae");
+    if (btnMore) {
+        const newBtnMore = btnMore.cloneNode(true);
+        btnMore.parentNode.replaceChild(newBtnMore, btnMore);
+        newBtnMore.addEventListener("click", () => {
+             document.getElementById("ipsae-group-2")?.classList.remove("d-none");
+             document.getElementById("ipsae-group-3")?.classList.remove("d-none");
+             newBtnMore.style.display = "none";
+        });
+    }
+
+    // Intercept header links for sorting
+    const thLinks = container.querySelectorAll('th a');
+    thLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+
+            const href = link.getAttribute('href');
+            const urlParams = new URLSearchParams(href.split('?')[1]);
+
+            const newSort = urlParams.get('sort');
+            const newDesc = urlParams.get('desc') === 'true';
+
+            if(newSort) {
+                cartState.sort = newSort;
+                cartState.desc = newDesc;
+                readOffcanvasInputs();
+                loadCartTable();
+            }
+        });
+    });
+
+    // Drag & Drop using SortableJS
+    const table = document.getElementById("results-table");
+    if (table && window.Sortable) {
+        const headerRow = table.tHead.rows[0];
+        Sortable.create(headerRow, {
+          animation: 150,
+          ghostClass: "table-warning",
+          filter: ".static-col",
+          preventOnFilter: false,
+          onEnd: (evt) => {
+             const orderedKeys = Array.from(headerRow.children)
+                .map(th => th.dataset.colkey)
+                .filter(Boolean);
+
+             cartState.cols = orderedKeys;
+             readOffcanvasInputs();
+             loadCartTable();
+          }
+        });
+    }
+}
+
+/**
+ * Updates the Cart Species Chart based on the selected mapping method filter.
+ */
+function updateCartSpeciesChart() {
+    const ctxSpecies = document.getElementById('cartSpeciesChart');
+    if (!ctxSpecies || currentCartSpeciesData.length === 0) return;
+
+    let filtered = currentCartSpeciesData;
+    if (currentSpeciesFilter !== 'all') {
+        filtered = currentCartSpeciesData.filter(d => d.method === currentSpeciesFilter);
+    }
+
+    const aggregated = {};
+    filtered.forEach(d => {
+        aggregated[d.name] = (aggregated[d.name] || 0) + d.count;
+    });
+
+    const finalData = Object.keys(aggregated)
+        .map(k => ({name: k, count: aggregated[k]}))
+        .sort((a,b) => b.count - a.count)
+        .slice(0, 8); // Top 8
+
+
+    if (speciesChart) {
+        speciesChart.destroy();
+    }
+
+    speciesChart = new Chart(ctxSpecies, {
+      type: 'doughnut',
+      data: {
+        labels: finalData.map(d => d.name),
+        datasets: [{
+          data: finalData.map(d => d.count),
+          backgroundColor: ['#3498db', '#e74c3c', '#9b59b6', '#2ecc71', '#f1c40f', '#34495e', '#e67e22', '#95a5a6'],
+        }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } } }
+    });
+}
+
+// Handle cart checkbox changes AND Species Filter
+document.addEventListener('change', (e) => {
+    // Intercept Species Filter Toggles
+    if (e.target && e.target.classList.contains('cart-species-filter')) {
+        currentSpeciesFilter = e.target.value;
+        updateCartSpeciesChart();
+    }
+
+    // Intercept Cart Item changes
+    if (e.target && e.target.classList.contains('cart-checkbox')) {
+        const acc = e.target.value;
+        if (e.target.checked) CartManager.add(acc);
+        else CartManager.remove(acc);
+
+        if (!e.target.checked) {
+             const row = e.target.closest('tr');
+             if(row) {
+                 row.style.opacity = "0";
+                 setTimeout(() => row.remove(), 300);
+             }
+
+             if(removeDebounceTimer) clearTimeout(removeDebounceTimer);
+             removeDebounceTimer = setTimeout(() => {
+                 readOffcanvasInputs();
+                 loadCartTable();
+             }, 800);
+        }
+    }
+});
+
+loadCartTable();
+
+
+
+/**
+ * Empties the cart after user confirmation.
+ */
+function clearCart() {
+    if(confirm("Clear cart?")) { CartManager.clear(); loadCartTable(); }
+}
+
+
+/**
+ * Handles the submission of the form to move items to a collection.
+ * @param {Event} e - The form submission event.
+ */
+async function submitChangeCollection(e) {
+    e.preventDefault();
+    const form = e.target;
+    const newTabActive = document.getElementById('tab-new').classList.contains('active');
+
+    let payload = {
+        accessions: CartManager.getAll(),
+        move_items: true
+    };
+
+    if (newTabActive) {
+        const newName = form.new_name.value.trim();
+        if (!newName) { alert("Please enter a name for the new collection."); return; }
+        payload.new_collection_name = newName;
+    } else {
+        const existId = form.existing_id.value;
+        if (!existId) { alert("Please select an existing collection."); return; }
+        payload.existing_collection_id = parseInt(existId);
+    }
+
+    const btn = form.querySelector('button[type="submit"]');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Processing...";
+
+    try {
+        const res = await fetch('/api/v1/complexes/bulk_collection_update', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+
+        if (res.status === 401) {
+            alert("Authentication failed. You need Admin permissions to move items.");
+            return;
+        }
+
+        if(res.ok) {
+            const data = await res.json();
+            alert(`Success! Moved ${data.moved_count} items.`);
+            window.location.reload();
+        } else {
+            const err = await res.json();
+            alert("Error: " + (err.detail || "Unknown"));
+        }
+    } catch(error) {
+        console.error(error);
+        alert("Network Error or Request Cancelled");
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
+/**
+ * Bulk deletes items from the database with an explicit warning.
+ */
+async function bulkDeleteFromDB() {
+    const accs = CartManager.getAll();
+    if(accs.length === 0) return;
+
+    if(!confirm(`⚠ WARNING: This will DELETE ${accs.length} complexes PERMANENTLY from the DATABASE!\n\n(Admin Password required)\n\nAre you sure?`)) return;
+
+    try {
+        const res = await fetch('/api/v1/complexes/bulk_delete', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(accs)
+        });
+
+        if (res.status === 401) {
+            alert("Authentication failed. You need Admin permissions to delete items.");
+            return;
+        }
+
+        if(res.ok) {
+            alert("Items successfully deleted from Database.");
+            CartManager.clear();
+            loadCartTable();
+        } else {
+            const err = await res.json();
+            alert("Error deleting: " + (err.detail || "Unknown error"));
+        }
+    } catch(err) {
+        alert("Network error or Authentication cancelled.");
+    }
+}
+
+loadCartTable();
+</script>
+{% endblock %}

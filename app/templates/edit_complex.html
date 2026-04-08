@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Edit {{ c.accession }} – AF3-DB{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-10">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white py-3">
+        <h1 class="h4 mb-0">Edit Complex: {{ c.accession }}</h1>
+      </div>
+      <div class="card-body">
+
+        <form method="POST" action="/complex/{{ c.accession }}/edit">
+
+          <h5 class="mb-3 border-bottom pb-2">General Information</h5>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold">Description</label>
+            <textarea name="description" class="form-control" rows="3">{{ c.description or '' }}</textarea>
+          </div>
+
+          <div class="row mb-4">
+            <div class="col-md-6">
+               <label class="form-label fw-bold">Collection</label>
+               <select name="collection_id" class="form-select">
+                   <option value="__none__" {% if not c.collection_id %}selected{% endif %}>-- No Collection --</option>
+                   {% for coll in collections %}
+                     <option value="{{ coll.id }}" {% if c.collection_id == coll.id %}selected{% endif %}>
+                       {{ coll.name }}
+                     </option>
+                   {% endfor %}
+               </select>
+               <div class="form-text">Choose an existing collection...</div>
+            </div>
+            <div class="col-md-6">
+               <label class="form-label fw-bold">Or Create New Collection</label>
+               <input type="text" name="new_collection_name" class="form-control" placeholder="New Collection Name">
+               <div class="form-text">...or type a name to create a new one.</div>
+            </div>
+          </div>
+
+          <h5 class="mb-3 border-bottom pb-2">Chains &amp; Mappings</h5>
+          <p class="text-muted small">
+            For each chain, select the correct UniProt Accession.
+            If you select a different one than automatic, it will be marked as "Manual Override".
+          </p>
+
+          {% set letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" %}
+
+          {% for ch in c.chains %}
+            {% set chain_letter = letters[loop.index0] %}
+
+            <div class="card mb-4 border-light bg-light">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-bold">Chain {{ chain_letter }} (ID: {{ ch.id }})</span>
+                    <span class="badge bg-secondary font-monospace">{{ ch.sequence[:10] }}...</span>
+                </div>
+                <div class="card-body">
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Protein Name</label>
+                            <input type="text" name="chain_{{ ch.id }}_protein_name"
+                                   class="form-control form-control-sm"
+                                   value="{{ ch.protein_name or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Gene Name</label>
+                            <input type="text" name="chain_{{ ch.id }}_gene_name"
+                                   class="form-control form-control-sm"
+                                   value="{{ ch.gene_name or '' }}">
+                        </div>
+                    </div>
+
+                    <label class="form-label small fw-bold">Select Primary Accession</label>
+                    <div class="list-group">
+
+                        {# Option: None #}
+                        <label class="list-group-item list-group-item-action d-flex gap-2 align-items-center">
+                            <input class="form-check-input flex-shrink-0" type="radio"
+                                   name="chain_{{ ch.id }}_primary_ac" value="__none__"
+                                   {% if not ch.primary_accession %}checked{% endif %}>
+                            <span>
+                                No Mapping (Unknown)
+                            </span>
+                        </label>
+
+                        {# Option: Available Mappings #}
+                        {% if ch.uniparc and ch.uniparc.accessions %}
+                            {% for ua in ch.uniparc.accessions %}
+                                <label class="list-group-item list-group-item-action d-flex gap-2 align-items-center">
+                                    <input class="form-check-input flex-shrink-0" type="radio"
+                                           name="chain_{{ ch.id }}_primary_ac" value="{{ ua.accession }}"
+                                           {% if ch.primary_accession == ua.accession %}checked{% endif %}>
+                                    <div class="w-100 justify-content-between">
+                                        <strong>{{ ua.accession }}</strong>
+                                        <small class="text-muted"> | {{ ua.gene_name }} | {{ ua.protein_name }}</small>
+                                        <div class="small text-muted fst-italic">
+                                            {{ ua.organism }} ({{ ua.status }})
+                                        </div>
+                                    </div>
+                                    {% if ch.primary_accession == ua.accession %}
+                                        <span class="badge bg-success ms-auto">Current</span>
+                                    {% endif %}
+                                </label>
+                            {% endfor %}
+                        {% else %}
+                             <div class="alert alert-warning py-1 small">No UniProt mappings found for this sequence.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+          {% endfor %}
+
+          <div class="d-flex justify-content-between mt-4">
+              <a href="/complex/{{ c.accession }}" class="btn btn-secondary">Cancel</a>
+              <button type="submit" class="btn btn-primary btn-lg">Save Changes</button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,701 @@
+{% if visible_cols is not defined %}
+  {% set visible_cols = ["accession","genes","proteins","collection","iptm","ptm","created","chains"] %}
+{% endif %}
+
+{% macro qs_url(new_page=None, new_sort=None, new_desc=None) -%}
+  {% set parts = [] %}
+  {% for k, v in params.multi_items() %}
+    {% if k not in ['page', 'sort', 'desc'] %}
+      {% set _ = parts.append(k ~ '=' ~ v) %}
+    {% endif %}
+  {% endfor %}
+  {% set _ = parts.append('page=' ~ (new_page if new_page is not none else page)) %}
+  {% set _ = parts.append('sort=' ~ (new_sort if new_sort is not none else (sort or "created"))) %}
+  {% set _ = parts.append('desc=' ~ ('true' if (new_desc if new_desc is not none else desc) else 'false')) %}
+  {{ request.url.path }}?{{ parts | join('&') }}
+{%- endmacro %}
+
+<div class="d-flex flex-wrap gap-2 mb-2 align-items-center justify-content-between">
+  <div>
+      <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="offcanvas" data-bs-target="#scoreCanvas">
+        ⚙ Change Columns and Scores
+      </button>
+  </div>
+</div>
+
+<div class="offcanvas offcanvas-end" tabindex="-1" id="scoreCanvas" style="min-width: 400px;">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title">Columns & Scores</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+  </div>
+  <div class="offcanvas-body">
+
+    <div class="mb-3 small text-muted">
+      <strong>Identity columns</strong><br>
+      Accession, Genes, Proteins and Collection are always shown.
+    </div>
+
+    <hr class="my-3">
+
+    <div class="mb-2"><strong>Basic scores</strong></div>
+    {% set basic_opts = [
+      ("iptm", "ipTM"),
+      ("ptm", "pTM"),
+      ("mean_iptm", "mean ipTM (all seeds)"),
+      ("mean_ptm", "mean pTM (all seeds)"),
+      ("created", "created"),
+      ("chains", "chains"),
+      ("ranking_score", "ranking_score"),
+      ("mean_plddt", "mean pLDDT"),
+      ("fraction_disordered", "fraction_disordered"),
+    ] %}
+    <div class="vstack gap-2 mb-3">
+      {% for key, label in basic_opts %}
+        <label class="form-check">
+          <input class="form-check-input col-check"
+                 type="checkbox"
+                 value="{{ key }}"
+                 {% if key in visible_cols %}checked{% endif %}>
+          <span class="form-check-label">{{ label }}</span>
+        </label>
+      {% endfor %}
+    </div>
+
+    <hr class="my-3">
+
+    <div class="mb-2"><strong>Biophysics</strong></div>
+    {% set biophys_opts = [
+      ("bsa", "Buried Surface Area (BSA)"),
+      ("num_h_bonds", "Hydrogen Bonds"),
+      ("num_salt_bridges", "Salt Bridges"),
+    ] %}
+    <div class="vstack gap-2 mb-3">
+      {% for key, label in biophys_opts %}
+        <label class="form-check">
+          <input class="form-check-input col-check"
+                 type="checkbox"
+                 value="{{ key }}"
+                 {% if key in visible_cols %}checked{% endif %}>
+          <span class="form-check-label">{{ label }}</span>
+        </label>
+      {% endfor %}
+    </div>
+
+    <hr class="my-3">
+
+    <div class="mb-2"><strong>Pairwise interactions</strong></div>
+    <div class="small text-muted mb-3">
+      Define specific chain pairs (e.g. A–B). Click <b>+</b> to add more pairs.
+    </div>
+
+    {% for i in range(3) %}
+    <div class="align-items-center gap-2 mb-2 pair-row {% if i == 0 %}d-flex{% else %}d-none{% endif %}"
+         id="pair-iptm-row-{{i}}">
+      <div class="form-check mb-0">
+        <input class="form-check-input pair-check" type="checkbox" data-metric="pair_iptm" data-idx="{{i}}">
+      </div>
+      <span class="small text-nowrap" style="width:65px;">Pair ipTM</span>
+      <span class="small text-muted">from</span>
+      <select class="form-select form-select-sm p-1 pair-c1" style="width:50px;">
+        {% for L in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" %}<option value="{{L}}" {% if L=='A' %}selected{% endif %}>{{L}}</option>{% endfor %}
+      </select>
+      <span class="small text-muted">to</span>
+      <select class="form-select form-select-sm p-1 pair-c2" style="width:50px;">
+        {% for L in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" %}<option value="{{L}}" {% if L=='B' %}selected{% endif %}>{{L}}</option>{% endfor %}
+      </select>
+      {% if i < 2 %}
+      <button type="button" class="btn btn-sm btn-light border px-2 py-0 ms-auto pair-plus-btn" data-target="#pair-iptm-row-{{i+1}}">＋</button>
+      {% else %}<div class="ms-auto" style="width:24px;"></div>{% endif %}
+    </div>
+    {% endfor %}
+
+    {% for i in range(3) %}
+    <div class="align-items-center gap-2 mb-2 pair-row {% if i == 0 %}d-flex{% else %}d-none{% endif %}"
+         id="pair-pae-row-{{i}}">
+      <div class="form-check mb-0">
+        <input class="form-check-input pair-check" type="checkbox" data-metric="pair_pae_min" data-idx="{{i}}">
+      </div>
+      <span class="small text-nowrap" style="width:65px;">min PAE</span>
+      <span class="small text-muted">from</span>
+      <select class="form-select form-select-sm p-1 pair-c1" style="width:50px;">
+        {% for L in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" %}<option value="{{L}}" {% if L=='A' %}selected{% endif %}>{{L}}</option>{% endfor %}
+      </select>
+      <span class="small text-muted">to</span>
+      <select class="form-select form-select-sm p-1 pair-c2" style="width:50px;">
+        {% for L in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" %}<option value="{{L}}" {% if L=='B' %}selected{% endif %}>{{L}}</option>{% endfor %}
+      </select>
+      {% if i < 2 %}
+      <button type="button" class="btn btn-sm btn-light border px-2 py-0 ms-auto pair-plus-btn" data-target="#pair-pae-row-{{i+1}}">＋</button>
+      {% else %}<div class="ms-auto" style="width:24px;"></div>{% endif %}
+    </div>
+    {% endfor %}
+
+    <hr class="my-3">
+
+    <div class="border rounded bg-light p-2 mb-3">
+      <strong>Custom Score</strong>
+      <div class="small text-muted mb-2">
+        Define your own metric using a python-like formula.<br>
+        Available: <code>iptm</code>, <code>ptm</code>, <code>ranking</code>, <code>plddt</code>, <code>bsa</code>, <code>num_h_bonds</code>, <code>num_salt_bridges</code>.<br>
+        Example: <code>(iptm + ptm) / 2 + bsa * 0.01</code>
+      </div>
+
+      <div class="mb-2">
+        <input type="text" id="custom-formula-input"
+               class="form-control form-control-sm font-monospace"
+               placeholder="e.g. iptm * 0.8 + ptm * 0.2"
+               value="{{ custom_formula }}">
+      </div>
+
+      <div class="form-check">
+        <input class="form-check-input col-check" type="checkbox"
+               id="check-custom-score" value="custom_score"
+               {% if "custom_score" in visible_cols and custom_formula %}checked{% endif %}>
+        <label class="form-check-label" for="check-custom-score">
+          Show Custom Score column
+        </label>
+      </div>
+    </div>
+
+    <hr class="my-3">
+
+    <div class="mb-2"><strong>ipSAE scores</strong></div>
+    <div class="border rounded p-2 mb-3">
+      <div class="row gx-2 gy-2 mb-2">
+         <div class="col-6">
+           <select id="ipsae_pae" class="form-select form-select-sm">
+             {% for val in [3, 5, 10, 15, 20] %}<option value="{{val}}" {% if ipsae_pae == val %}selected{% endif %}>PAE ≤ {{val}} Å</option>{% endfor %}
+           </select>
+         </div>
+         <div class="col-6">
+           <select id="ipsae_pair" class="form-select form-select-sm">
+             <option value="MAX" {% if ipsae_pair == 'MAX' %}selected{% endif %}>Best Pair</option>
+             {% for p in ["A-B", "A-C", "B-C", "A-D", "B-D", "C-D", "A-E", "B-E", "C-E", "D-E"] %}
+               <option value="{{p}}" {% if ipsae_pair == p %}selected{% endif %}>{{p}}</option>
+             {% endfor %}
+           </select>
+         </div>
+      </div>
+      <div class="vstack gap-1">
+        {% for k,l in [("ipsae","ipSAE"),("ipsae_d0chn","ipSAE d0chn"),("ipsae_d0dom","ipSAE d0dom"),("iptm_d0chn","ipTM d0chn"),("pdockq","pDockQ"),("pdockq2","pDockQ2"),("lis","LIS")] %}
+          <label class="form-check"><input class="form-check-input col-check" type="checkbox" value="{{k}}" {% if k in visible_cols %}checked{% endif %}><span class="form-check-label">{{l}}</span></label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div id="ipsae-group-2" class="border rounded p-2 mb-3 d-none">
+       <div class="row gx-2 gy-2 mb-2">
+         <div class="col-6"><select id="ipsae_pae_2" class="form-select form-select-sm">{% for val in [3,5,10,15,20] %}<option value="{{val}}" {% if ipsae_pae_2 == val %}selected{% endif %}>PAE ≤ {{val}} Å</option>{% endfor %}</select></div>
+         <div class="col-6">
+           <select id="ipsae_pair_2" class="form-select form-select-sm">
+             <option value="MAX" {% if ipsae_pair_2 == 'MAX' %}selected{% endif %}>Best Pair</option>
+             {% for p in ["A-B", "A-C", "B-C", "A-D", "B-D", "C-D", "A-E", "B-E", "C-E", "D-E"] %}
+               <option value="{{p}}" {% if ipsae_pair_2 == p %}selected{% endif %}>{{p}}</option>
+             {% endfor %}
+           </select>
+         </div>
+       </div>
+       <div class="vstack gap-1">
+         {% for k,l in [("ipsae_2","ipSAE #2"),("ipsae_d0chn_2","ipSAE d0chn #2"),("ipsae_d0dom_2","ipSAE d0dom #2"),("iptm_d0chn_2","ipTM d0chn #2"),("pdockq_2","pDockQ #2"),("pdockq2_2","pDockQ2 #2"),("lis_2","LIS #2")] %}
+          <label class="form-check"><input class="form-check-input col-check" type="checkbox" value="{{k}}" {% if k in visible_cols %}checked{% endif %}><span class="form-check-label">{{l}}</span></label>
+         {% endfor %}
+       </div>
+    </div>
+    <div id="ipsae-group-3" class="border rounded p-2 mb-3 d-none">
+       <div class="row gx-2 gy-2 mb-2">
+         <div class="col-6"><select id="ipsae_pae_3" class="form-select form-select-sm">{% for val in [3,5,10,15,20] %}<option value="{{val}}" {% if ipsae_pae_3 == val %}selected{% endif %}>PAE ≤ {{val}} Å</option>{% endfor %}</select></div>
+         <div class="col-6">
+           <select id="ipsae_pair_3" class="form-select form-select-sm">
+             <option value="MAX" {% if ipsae_pair_3 == 'MAX' %}selected{% endif %}>Best Pair</option>
+             {% for p in ["A-B", "A-C", "B-C", "A-D", "B-D", "C-D", "A-E", "B-E", "C-E", "D-E"] %}
+               <option value="{{p}}" {% if ipsae_pair_3 == p %}selected{% endif %}>{{p}}</option>
+             {% endfor %}
+           </select>
+         </div>
+       </div>
+       <div class="vstack gap-1">
+         {% for k,l in [("ipsae_3","ipSAE #3"),("ipsae_d0chn_3","ipSAE d0chn #3"),("ipsae_d0dom_3","ipSAE d0dom #3"),("iptm_d0chn_3","ipTM d0chn #3"),("pdockq_3","pDockQ #3"),("pdockq2_3","pDockQ2 #3"),("lis_3","LIS #3")] %}
+          <label class="form-check"><input class="form-check-input col-check" type="checkbox" value="{{k}}" {% if k in visible_cols %}checked{% endif %}><span class="form-check-label">{{l}}</span></label>
+         {% endfor %}
+       </div>
+    </div>
+    <button class="btn btn-sm btn-outline-primary mb-3" id="btn-more-ipsae">More ipSAEs</button>
+
+    <hr class="my-3">
+
+    <div class="border rounded bg-light p-2 mb-3">
+      <strong>mean-pLDDT in region</strong>
+      <div class="row gx-2 gy-2 mb-2">
+        <div class="col-6"><select id="plddt-chain" class="form-select form-select-sm"><option value="" {% if not plddt_chain %}selected{% endif %}>all</option>{% for L in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" %}<option value="{{L}}" {% if plddt_chain==L %}selected{% endif %}>{{L}}</option>{% endfor %}</select></div>
+        <div class="col-6"><input id="plddt-center" type="number" min="1" value="{{ plddt_center or '' }}" class="form-control form-control-sm"></div>
+      </div>
+      <div class="vstack gap-1 mt-2">
+        {% for r in [5,10,15] %}<label class="form-check"><input class="form-check-input col-check" type="checkbox" value="mean_plddt_radius_{{r}}" {% if ("mean_plddt_radius_"~r) in visible_cols %}checked{% endif %}><span class="form-check-label">mean-pLDDT {{r}}Å</span></label>{% endfor %}
+      </div>
+    </div>
+
+    <button class="btn btn-sm btn-primary" id="apply-cols">Apply</button>
+    <button class="btn btn-sm btn-outline-secondary" id="reset-cols">Reset</button>
+  </div>
+</div>
+
+<div class="table-responsive">
+  <table id="results-table" class="table table-hover bg-white shadow-sm align-middle">
+    <thead class="table-light">
+      <tr>
+        <th class="text-center static-col bg-light" style="width: 40px; cursor: default;">
+             <input class="form-check-input" type="checkbox" id="select-all-header" title="Select all on this page">
+        </th>
+
+        {% set LABELS = {
+          "accession":"Accession", "genes":"Genes", "proteins":"Proteins", "collection":"Collection",
+          "iptm":"ipTM", "ptm":"pTM", "mean_iptm":"mean ipTM", "mean_ptm":"mean pTM",
+          "created":"Created", "chains":"Chains",
+          "ranking_score":"ranking_score", "mean_plddt":"mean pLDDT", "fraction_disordered":"fract. disord.",
+          "bsa":"BSA (Å²)", "num_h_bonds":"H-Bonds", "num_salt_bridges":"Salt Bridges",
+          "custom_score": "Custom Score",
+          "ipsae":"ipSAE", "ipsae_d0chn":"ipSAE d0chn", "ipsae_d0dom":"ipSAE d0dom", "iptm_d0chn":"ipTM d0chn", "pdockq":"pDockQ", "pdockq2":"pDockQ2", "lis":"LIS",
+          "ipsae_2":"ipSAE #2", "ipsae_d0chn_2":"ipSAE d0chn #2", "ipsae_d0dom_2":"ipSAE d0dom #2", "iptm_d0chn_2":"ipTM d0chn #2", "pdockq_2":"pDockQ #2", "pdockq2_2":"pDockQ2 #2", "lis_2":"LIS #2",
+          "ipsae_3":"ipSAE #3", "ipsae_d0chn_3":"ipSAE d0chn #3", "ipsae_d0dom_3":"ipSAE d0dom #3", "iptm_d0chn_3":"ipTM d0chn #3", "pdockq_3":"pDockQ #3", "pdockq2_3":"pDockQ2 #3", "lis_3":"LIS #3",
+          "mean_plddt_radius_5":"pLDDT(5Å)", "mean_plddt_radius_10":"pLDDT(10Å)", "mean_plddt_radius_15":"pLDDT(15Å)",
+        } %}
+
+        {% set SORTFIELDS = {
+          "iptm":"iptm", "ptm":"ptm", "mean_iptm":"mean_iptm", "mean_ptm":"mean_ptm",
+          "created":"created", "chains":"chains", "ranking_score":"ranking", "mean_plddt":"plddt", "fraction_disordered":"fraction_disordered",
+          "bsa":"bsa", "num_h_bonds":"num_h_bonds", "num_salt_bridges":"num_salt_bridges",
+          "custom_score": "custom_score",
+          "ipsae":"ipsae", "ipsae_d0chn":"ipsae_d0chn", "ipsae_d0dom":"ipsae_d0dom", "iptm_d0chn":"iptm_d0chn", "pdockq":"pdockq", "pdockq2":"pdockq2", "lis":"lis",
+          "ipsae_2":"ipsae_2", "ipsae_d0chn_2":"ipsae_d0chn_2", "ipsae_d0dom_2":"ipsae_d0dom_2", "iptm_d0chn_2":"iptm_d0chn_2", "pdockq_2":"pdockq_2", "pdockq2_2":"pdockq2_2", "lis_2":"lis_2",
+          "ipsae_3":"ipsae_3", "ipsae_d0chn_3":"ipsae_d0chn_3", "ipsae_d0dom_3":"ipsae_d0dom_3", "iptm_d0chn_3":"iptm_d0chn_3", "pdockq_3":"pdockq_3", "pdockq2_3":"pdockq2_3", "lis_3":"lis_3",
+          "mean_plddt_radius_5":"plddt_r5", "mean_plddt_radius_10":"plddt_r10", "mean_plddt_radius_15":"plddt_r15",
+        } %}
+
+        {% macro th(label, field, colkey) -%}
+          {% if field %}
+            {% set active = (sort == field) %}
+            {% set symbol = "↕" %}
+            {% if active %}{% set symbol = "↑" if not desc else "↓" %}{% endif %}
+            <th data-colkey="{{ colkey }}" class="text-nowrap user-select-none" style="cursor: pointer;">
+              <a href="{{ qs_url(1, field, not desc if active else desc) }}"
+                 class="text-decoration-none text-dark d-flex align-items-center justify-content-between">
+                <span>{{ label }}</span>
+                <span class="ms-1 small fw-bold {% if not active %}text-muted opacity-25{% endif %}">{{ symbol }}</span>
+              </a>
+            </th>
+          {% else %}
+            <th data-colkey="{{ colkey }}" class="text-nowrap">{{ label }}</th>
+          {% endif %}
+        {%- endmacro %}
+
+        {% for key in visible_cols %}
+           {% if key.startswith("pair_") %}
+              {% set parts = key.split("__") %}
+              {% set metric = parts[0] %}
+              {% set c1 = parts[1] %}
+              {% set c2 = parts[2] %}
+              {% set label = "Pair ipTM " if metric == "pair_iptm" else "min PAE " %}
+              {{ th(label ~ c1 ~ "–" ~ c2, key, key) }}
+           {% else %}
+               {% if key in SORTFIELDS %}
+                   {{ th(LABELS.get(key, key), SORTFIELDS[key], key) }}
+               {% else %}
+                   {{ th(LABELS.get(key, key), None, key) }}
+               {% endif %}
+           {% endif %}
+        {% endfor %}
+      </tr>
+    </thead>
+
+    <tbody>
+      {% for c in complexes %}
+      <tr {% if c.processing_status == 'PROCESSING' %}data-processing-accession="{{ c.accession }}"{% endif %}>
+        <td class="text-center bg-white">
+            <input class="form-check-input cart-checkbox" type="checkbox" value="{{ c.accession }}">
+        </td>
+
+        {% for key in visible_cols %}
+          {% if key == "accession" %}
+            <td data-colkey="accession">
+              {% if c.processing_status == 'PROCESSING' %}
+                <span class="text-muted text-nowrap">
+                  <span class="spinner-border spinner-border-sm text-primary me-1" role="status" aria-hidden="true"></span>
+                  {{ c.accession }}
+                </span>
+                <span class="badge bg-warning text-dark ms-1 mt-1">Processing</span>
+              {% elif c.processing_status == 'FAILED' %}
+                <span class="text-danger text-nowrap">{{ c.accession }}</span>
+                <span class="badge bg-danger ms-1 mt-1">Failed</span>
+              {% else %}
+                <a href="/complex/{{ c.accession }}" class="fw-bold text-decoration-none">{{ c.accession }}</a>
+              {% endif %}
+            </td>
+          {% elif key == "genes" %}
+            <td data-colkey="genes" class="text-break" style="max-width:200px;">{{ c.summary_genes or "-" }}</td>
+          {% elif key == "proteins" %}
+            <td data-colkey="proteins" class="text-break" style="max-width:250px;">{{ c.summary_names or "-" }}</td>
+          {% elif key == "collection" %}
+            <td data-colkey="collection">
+              {% if c.collection %}
+                <a href="/show_collection/{{ c.collection.name|urlencode }}" class="badge bg-secondary text-decoration-none">{{ c.collection.name }}</a>
+              {% else %}<span class="text-muted">-</span>{% endif %}
+            </td>
+          {% elif key == "iptm" %}
+            <td data-colkey="iptm">{{ "%.3f"|format(c.iptm) if c.iptm else "-" }}</td>
+          {% elif key == "ptm" %}
+            <td data-colkey="ptm">{{ "%.3f"|format(c.ptm) if c.ptm else "-" }}</td>
+          {% elif key == "mean_iptm" %}
+            <td data-colkey="mean_iptm">{{ "%.3f"|format(c.mean_iptm) if c.mean_iptm else "-" }}</td>
+          {% elif key == "mean_ptm" %}
+            <td data-colkey="mean_ptm">{{ "%.3f"|format(c.mean_ptm) if c.mean_ptm else "-" }}</td>
+          {% elif key == "custom_score" %}
+             <td data-colkey="custom_score" class="fw-bold text-primary">
+               {% if c.custom_score_val is not none %}{{ "%.3f"|format(c.custom_score_val) }}{% else %}-{% endif %}
+             </td>
+          {% elif key == "created" %}
+            <td data-colkey="created" class="small text-muted">{{ c.created_at.strftime('%Y-%m-%d') if c.created_at else "-" }}</td>
+          {% elif key == "chains" %}
+            <td data-colkey="chains">{{ c.chains|length }}</td>
+          {% elif key == "ranking_score" %}
+            <td data-colkey="ranking_score">{{ "%.3f"|format(c.ranking_score) if c.ranking_score else "-" }}</td>
+          {% elif key == "mean_plddt" %}
+            <td data-colkey="mean_plddt">{{ "%.1f"|format(c.mean_plddt) if c.mean_plddt else "-" }}</td>
+          {% elif key == "fraction_disordered" %}
+            <td data-colkey="fraction_disordered">{{ "%.3f"|format(c.fraction_disordered) if c.fraction_disordered else "-" }}</td>
+
+          {% elif key.startswith("pair_") %}
+            <td data-colkey="{{ key }}">
+               {% if c.pairwise_values and c.pairwise_values[key] is not none %}
+                 {{ "%.2f"|format(c.pairwise_values[key]) }}
+               {% else %}-{% endif %}
+            </td>
+
+          {% else %}
+             {% set attr_name = key %}
+             {% set pae = ipsae_pae %}
+             {% set pair = ipsae_pair %}
+
+             {% if key.endswith("_2") %}
+                 {% set attr_name = key | replace("_2", "") %}
+                 {% set pae = ipsae_pae_2 %}
+                 {% set pair = ipsae_pair_2 %}
+             {% elif key.endswith("_3") %}
+                 {% set attr_name = key | replace("_3", "") %}
+                 {% set pae = ipsae_pae_3 %}
+                 {% set pair = ipsae_pair_3 %}
+             {% endif %}
+
+             {% set is_ipsae_metric = attr_name in ["ipsae", "ipsae_d0chn", "ipsae_d0dom", "iptm_d0chn"] %}
+             {% set is_const_metric = attr_name in ["pdockq", "pdockq2", "lis"] %}
+
+             <td data-colkey="{{ key }}">
+                {% if is_ipsae_metric or is_const_metric %}
+                    {% set val = None %}
+                    {% set bp_label = None %}
+
+                    {% if pair == 'MAX' %}
+                        {% if is_const_metric %}
+                           {% set val = c[attr_name] if c[attr_name] is defined else c|attr(attr_name) %}
+                        {% else %}
+                           {% set col_name = attr_name ~ "_" ~ pae %}
+                           {% set val = c[col_name] if c[col_name] is defined else c|attr(col_name) %}
+                           {% set bp_col = "ipsae_best_pair_" ~ pae %}
+                           {% set bp_label = c[bp_col] if c[bp_col] is defined else c|attr(bp_col) %}
+                        {% endif %}
+                    {% else %}
+                        {% set c1 = pair.split("-")[0] %}
+                        {% set c2 = pair.split("-")[1] %}
+                        {% set ns = namespace(found_val=none) %}
+                        {% for iscore in c.interface_scores %}
+                            {% if iscore.pae_cutoff|int == pae|int and ((iscore.chain1 == c1 and iscore.chain2 == c2) or (iscore.chain1 == c2 and iscore.chain2 == c1)) %}
+                                {% set ns.found_val = iscore|attr(attr_name) %}
+                            {% endif %}
+                        {% endfor %}
+                        {% set val = ns.found_val %}
+                    {% endif %}
+
+                    {% if val is not none %}
+                        {{ "%.4f"|format(val) }}
+                        {% if bp_label and attr_name == "ipsae" %}
+                           <span class="text-muted small ms-1" title="Highest scoring interface">({{ bp_label }})</span>
+                        {% endif %}
+                    {% else %}-{% endif %}
+                {% else %}
+                    {% set val = c[attr_name ~ "_current"] if c[attr_name ~ "_current"] is defined else (c[key] if c[key] is defined else c|attr(key)) %}
+                    {% if val is number %}
+                        {% if val is float %}{{ "%.4f"|format(val) }}{% else %}{{ val }}{% endif %}
+                    {% else %}
+                        {{ val or "-" }}
+                    {% endif %}
+                {% endif %}
+             </td>
+          {% endif %}
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if complexes|length >= 20 or page|int > 1 %}
+<nav class="mt-3">
+  <ul class="pagination pagination-sm justify-content-center">
+    {% if page|int > 1 %}
+      <li class="page-item"><a class="page-link" href="{{ qs_url(page|int - 1) }}">« prev</a></li>
+    {% endif %}
+    <li class="page-item active"><span class="page-link">{{ page }}</span></li>
+    {% if complexes|length == 20 %}
+      <li class="page-item"><a class="page-link" href="{{ qs_url(page|int + 1) }}">next »</a></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+
+<script src="/static/third-party/sortablejs-1.15.2/Sortable.min.js"></script>
+<script>
+  // Column logic
+  const IDENTITY_COLS = ["accession","genes","proteins","collection"];
+  const BASIC_COLS    = ["iptm","ptm","created","chains"];
+
+  function getCurrentColsFromURL() {
+    const url = new URL(window.location.href);
+    const cols = url.searchParams.getAll("cols");
+    return cols.length ? cols : [...IDENTITY_COLS, ...BASIC_COLS];
+  }
+
+  function updateCols(selectedScoreCols) {
+    if (window.onUpdateCols) {
+        window.onUpdateCols(selectedScoreCols);
+        return;
+    }
+
+    const url = new URL(window.location.href);
+    const params = url.searchParams;
+    const current = getCurrentColsFromURL();
+
+    const keep = current.filter(k => IDENTITY_COLS.includes(k) || selectedScoreCols.includes(k));
+    const add  = selectedScoreCols.filter(k => !keep.includes(k));
+    let finalCols = [...keep, ...add];
+
+    document.querySelectorAll('.pair-row').forEach(row => {
+        const checkbox = row.querySelector('.pair-check');
+        if (checkbox && checkbox.checked) {
+            const metric = checkbox.dataset.metric;
+            const c1 = row.querySelector('.pair-c1').value;
+            const c2 = row.querySelector('.pair-c2').value;
+            const key = `${metric}__${c1}__${c2}`;
+            if (!finalCols.includes(key)) finalCols.push(key);
+        }
+    });
+
+    params.delete("cols");
+    finalCols.forEach(v => params.append("cols", v));
+
+    const formulaInput = document.getElementById('custom-formula-input');
+    if (formulaInput && formulaInput.value.trim()) {
+        params.set("custom_formula", formulaInput.value.trim());
+    } else {
+        params.delete("custom_formula");
+    }
+
+    const center = document.getElementById("plddt-center")?.value || "";
+    const chain  = document.getElementById("plddt-chain")?.value || "";
+    if (center) params.set("plddt_center", center); else params.delete("plddt_center");
+    if (chain)  params.set("plddt_chain", chain);   else params.delete("plddt_chain");
+
+    ["ipsae_pae","ipsae_pair","ipsae_pae_2","ipsae_pair_2","ipsae_pae_3","ipsae_pair_3"].forEach(id => {
+        const val = document.getElementById(id)?.value || "";
+        if (val) params.set(id, val); else params.delete(id);
+    });
+
+    params.set("page", "1");
+    window.location.href = url.toString();
+  }
+
+  // Cart logic
+  function getCart() {
+      if (window.CartManager) return window.CartManager;
+
+      return {
+          getAll: () => {
+             try { return JSON.parse(localStorage.getItem('af3_cart') || '[]'); }
+             catch(e){ return []; }
+          },
+          add: (acc) => {
+             let list = JSON.parse(localStorage.getItem('af3_cart') || '[]');
+             if(!list.includes(acc)) {
+                 list.push(acc);
+                 localStorage.setItem('af3_cart', JSON.stringify(list));
+             }
+             window.dispatchEvent(new Event('storage'));
+          },
+          remove: (acc) => {
+             let list = JSON.parse(localStorage.getItem('af3_cart') || '[]');
+             list = list.filter(x => x !== acc);
+             localStorage.setItem('af3_cart', JSON.stringify(list));
+             window.dispatchEvent(new Event('storage'));
+          }
+      };
+  }
+
+  function syncCheckboxes() {
+      const cm = getCart();
+      const selected = cm.getAll();
+      document.querySelectorAll('.cart-checkbox').forEach(cb => {
+          cb.checked = selected.includes(cb.value);
+      });
+      updateHeaderCheckbox();
+  }
+
+  function updateHeaderCheckbox() {
+      const allBoxes = Array.from(document.querySelectorAll('.cart-checkbox'));
+      const headerBox = document.getElementById('select-all-header');
+      if(!headerBox || allBoxes.length === 0) return;
+
+      const allChecked = allBoxes.every(cb => cb.checked);
+      headerBox.checked = allChecked;
+      headerBox.indeterminate = !allChecked && allBoxes.some(cb => cb.checked);
+  }
+
+  document.addEventListener('change', function(e) {
+      if (e.target && e.target.classList.contains('cart-checkbox')) {
+          const cm = getCart();
+          const val = e.target.value;
+
+          if(e.target.checked) cm.add(val);
+          else cm.remove(val);
+
+          updateHeaderCheckbox();
+          window.dispatchEvent(new Event('cart-updated'));
+      }
+
+      if (e.target && e.target.id === 'select-all-header') {
+          const cm = getCart();
+          const check = e.target.checked;
+
+          document.querySelectorAll('.cart-checkbox').forEach(cb => {
+              if(cb.checked !== check) {
+                  cb.checked = check;
+                  if(check) cm.add(cb.value);
+                  else cm.remove(cb.value);
+              }
+          });
+
+          window.dispatchEvent(new Event('cart-updated'));
+      }
+  });
+
+  // Initialization
+  function initPairwiseState() {
+     const cols = getCurrentColsFromURL();
+     const usedMetrics = { "pair_iptm": 0, "pair_pae_min": 0 };
+     cols.forEach(col => {
+         if (col.startsWith("pair_")) {
+             const parts = col.split("__");
+             if (parts.length === 3) {
+                 const metric = parts[0];
+                 const idx = usedMetrics[metric];
+                 if (idx < 3) {
+                     const row = document.getElementById(metric === "pair_iptm" ? `pair-iptm-row-${idx}` : `pair-pae-row-${idx}`);
+                     if (row) {
+                         row.classList.remove('d-none');
+                         row.classList.add('d-flex');
+                         const cb = row.querySelector('.pair-check');
+                         if(cb) cb.checked = true;
+                         const s1 = row.querySelector('.pair-c1');
+                         const s2 = row.querySelector('.pair-c2');
+                         if(s1) s1.value = parts[1];
+                         if(s2) s2.value = parts[2];
+                     }
+                     usedMetrics[metric]++;
+                 }
+             }
+         }
+     });
+     for(let m in usedMetrics) {
+         for(let i=0; i < usedMetrics[m]; i++) {
+             const row = document.getElementById(m === "pair_iptm" ? `pair-iptm-row-${i}` : `pair-pae-row-${i}`);
+             if(row && row.classList.contains('d-none')) { row.classList.remove('d-none'); row.classList.add('d-flex'); }
+         }
+     }
+  }
+
+  // Handle ipSAE UI Toggling
+  function initIpsaeState() {
+      const btnMoreIpsae = document.getElementById("btn-more-ipsae");
+      const ipsaeGroup2 = document.getElementById("ipsae-group-2");
+      const ipsaeGroup3 = document.getElementById("ipsae-group-3");
+
+      if (btnMoreIpsae) {
+          btnMoreIpsae.addEventListener("click", () => {
+              if (ipsaeGroup2 && ipsaeGroup2.classList.contains("d-none")) {
+                  ipsaeGroup2.classList.remove("d-none");
+              } else if (ipsaeGroup3 && ipsaeGroup3.classList.contains("d-none")) {
+                  ipsaeGroup3.classList.remove("d-none");
+                  btnMoreIpsae.classList.add("d-none"); // Hide button since max is reached
+              }
+          });
+      }
+
+      // Check URL state to see if they were already active
+      const cols = getCurrentColsFromURL();
+      const hasGroup2 = cols.some(c => c.endsWith("_2"));
+      const hasGroup3 = cols.some(c => c.endsWith("_3"));
+
+      if (hasGroup2 && ipsaeGroup2) ipsaeGroup2.classList.remove("d-none");
+      if (hasGroup3 && ipsaeGroup3) {
+          if (ipsaeGroup2) ipsaeGroup2.classList.remove("d-none");
+          ipsaeGroup3.classList.remove("d-none");
+          if (btnMoreIpsae) btnMoreIpsae.classList.add("d-none");
+      }
+  }
+
+  document.getElementById("apply-cols")?.addEventListener("click", () => {
+    const checks = Array.from(document.querySelectorAll(".col-check:checked"));
+    updateCols(checks.map(c => c.value));
+  });
+  document.getElementById("reset-cols")?.addEventListener("click", () => updateCols([...BASIC_COLS]));
+
+  document.querySelectorAll('.pair-plus-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+          const target = document.querySelector(btn.dataset.target);
+          if (target) {
+              target.classList.remove('d-none');
+              target.classList.add('d-flex');
+              btn.style.display = 'none';
+          }
+      });
+  });
+
+  const table = document.getElementById("results-table");
+  if (table) {
+    const headerRow = table.tHead.rows[0];
+    Sortable.create(headerRow, {
+      animation: 150,
+      ghostClass: "table-warning",
+      filter: ".static-col",
+      preventOnFilter: false,
+      onEnd: (evt) => {
+        if (evt.oldIndex === evt.newIndex) return;
+        const tbodyRows = table.tBodies[0].rows;
+        for (const tr of tbodyRows) {
+          const cells = Array.from(tr.children);
+          const moved = cells[evt.oldIndex];
+          if (evt.newIndex > evt.oldIndex) tr.insertBefore(moved, cells[evt.newIndex].nextSibling);
+          else tr.insertBefore(moved, cells[evt.newIndex]);
+        }
+        const orderedKeys = Array.from(headerRow.children).map(th => th.dataset.colkey).filter(Boolean);
+        const url = new URL(window.location.href);
+        url.searchParams.delete("cols");
+        orderedKeys.forEach(k => url.searchParams.append("cols", k));
+        window.history.replaceState({}, "", url.toString());
+      }
+    });
+  }
+
+  syncCheckboxes();
+  initPairwiseState();
+  initIpsaeState();
+  window.addEventListener('load', syncCheckboxes);
+
+</script>

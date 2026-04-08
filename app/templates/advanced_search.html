@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Advanced Search – AF3-DB{% endblock %}
+
+{% block head_extra %}
+  <link href="/static/third-party/ajax/libs/noUiSlider/14.6.3/nouislider.min.css" rel="stylesheet">
+  <style>
+    .slider-container { width: 200px; margin: 0 1rem; }
+    .slider-input     { width: 60px; }
+    .slider-row       { display: flex; align-items: center; margin-bottom: 1rem; }
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+    input[type=number] { -moz-appearance: textfield; }
+  </style>
+{% endblock %}
+
+{% block content %}
+<form id="adv-search-form" method="post" action="/advanced-search" class="bg-white p-4 shadow-sm">
+
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <label class="form-label">Collection</label>
+      <select name="collection_id" class="form-select form-select-sm">
+        <option value="">Any Collection</option>
+        {% for coll in collections %}
+          <option value="{{ coll.id }}">{{ coll.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Oligomeric State</label>
+      <select name="oligomeric_state" class="form-select form-select-sm">
+        <option value="">Any</option>
+        <option value="monomer">Monomer (1 chain)</option>
+        <option value="homomer">Homomer (≥2 identical chains)</option>
+        <option value="heteromer">Heteromer (≥2 distinct chains)</option>
+      </select>
+    </div>
+  </div>
+
+  {% for cfg in [
+      {'key':'iptm','label':'ipTM range','min':0,'max':1,'step':0.01,'start':[0,1]},
+      {'key':'ptm','label':'pTM range','min':0,'max':1,'step':0.01,'start':[0,1]},
+      {'key':'plddt','label':'mean-pLDDT range','min':0,'max':100,'step':0.1,'start':[0,100]},
+      {'key':'ranking','label':'Ranking range','min':0,'max':1,'step':0.01,'start':[0,1]}
+    ] %}
+  <div class="mb-4">
+    <label class="form-label">{{ cfg.label }}</label>
+    <div class="slider-row">
+      <input  name="{{ cfg.key }}_min" id="{{ cfg.key }}_min_input"
+              type="number" class="form-control form-control-sm slider-input"
+              step="{{ cfg.step }}" min="{{ cfg.min }}" max="{{ cfg.max }}" placeholder="min">
+      <div   id="{{ cfg.key }}-slider" class="slider-container"></div>
+      <input  name="{{ cfg.key }}_max" id="{{ cfg.key }}_max_input"
+              type="number" class="form-control form-control-sm slider-input"
+              step="{{ cfg.step }}" min="{{ cfg.min }}" max="{{ cfg.max }}" placeholder="max">
+    </div>
+  </div>
+  {% endfor %}
+
+  <div class="form-check mb-4">
+    <input class="form-check-input" type="checkbox" name="has_clash_exclude" id="clashEx" value="true">
+    <label class="form-check-label" for="clashEx">Exclude complexes with chain-clashes</label>
+  </div>
+
+  <div id="chain-container"></div>
+
+  <button type="button" class="btn btn-sm btn-secondary mb-4" id="add-chain">
+    ＋ Add Chain Filter
+  </button>
+  <br>
+  <button type="submit" class="btn btn-primary">Filter</button>
+
+  <div class="border rounded bg-light mt-3 p-2 small text-muted">
+    <strong>Search syntax</strong><br>
+    <ul class="mb-1 ps-3">
+      <li>Combine terms with <code>AND</code> or <code>OR</code> (case‑insensitive).</li>
+      <li>For <b>sequence searching</b>, use the dropdown to choose between <i>substring</i> (partial sequence) or <i>exact match</i>. For homology search (indels, substitutions), use the Foldseek tool.</li>
+      <li>Every term is searched in sequence, UPI, UniProt accession, gene name, protein name, organism and alternative names.</li>
+    </ul>
+    <strong>Examples</strong><br>
+    <code>Homo sapiens AND ubiquitin</code> — both terms must occur somewhere.<br>
+    <code>kinase OR phosphatase AND Arabidopsis</code> → treated as
+    <code>kinase</code> OR (<code>phosphatase</code> AND <code>Arabidopsis</code>).
+  </div>
+
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/third-party/ajax/libs/noUiSlider/14.6.3/nouislider.min.js"></script>
+<script>
+// Slider-Helper
+function initSlider(elem, minInput, maxInput, cfg){
+  noUiSlider.create(elem,{start:cfg.start,connect:true,step:cfg.step,
+                          range:{min:cfg.min,max:cfg.max}});
+  elem.noUiSlider.on('update', v=>{
+    minInput.value = parseFloat(v[0]).toFixed(cfg.key==='plddt'?1:2);
+    maxInput.value = parseFloat(v[1]).toFixed(cfg.key==='plddt'?1:2);
+  });
+  minInput.addEventListener('change', ()=>elem.noUiSlider.set([minInput.value,null]));
+  maxInput.addEventListener('change', ()=>elem.noUiSlider.set([null,maxInput.value]));
+}
+
+// Global Slider
+const globalCfg=[
+  {key:'iptm',min:0,max:1,step:0.01,start:[0,1]},
+  {key:'ptm',min:0,max:1,step:0.01,start:[0,1]},
+  {key:'plddt',min:0,max:100,step:0.1,start:[0,100]},
+  {key:'ranking',min:0,max:1,step:0.01,start:[0,1]},
+];
+globalCfg.forEach(cfg=>{
+  initSlider(
+    document.getElementById(`${cfg.key}-slider`),
+    document.getElementById(`${cfg.key}_min_input`),
+    document.getElementById(`${cfg.key}_max_input`),
+    cfg
+  );
+});
+
+// Chain-Filter Template
+const chainTpl = () => `
+  <div class="chain-group mb-3 p-3 border rounded bg-white">
+    <h6>Chain Filter</h6>
+    <div class="row gx-3 gy-2">
+      <div class="col-md-4">
+        <label class="form-label">Sequence / UPI / UniProt / Gene / Protein / Organism</label>
+        <input type="text" name="chain_seq" class="form-control form-control-sm mb-2" placeholder="Search term...">
+        <select name="chain_match_type" class="form-select form-select-sm">
+            <option value="substring">Substring / Partial Match</option>
+            <option value="exact">Exact Sequence Match</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">chain iptm range</label>
+        <div class="slider-row">
+          <input name="chain_iptm_min" class="form-control form-control-sm slider-input"
+                 type="number" step="0.01" min="0" max="1" placeholder="min">
+          <div  class="chain-iptm-slider slider-container"></div>
+          <input name="chain_iptm_max" class="form-control form-control-sm slider-input"
+                 type="number" step="0.01" min="0" max="1" placeholder="max">
+        </div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">chain ptm range</label>
+        <div class="slider-row">
+          <input name="chain_ptm_min" class="form-control form-control-sm slider-input"
+                 type="number" step="0.01" min="0" max="1" placeholder="min">
+          <div  class="chain-ptm-slider slider-container"></div>
+          <input name="chain_ptm_max" class="form-control form-control-sm slider-input"
+                 type="number" step="0.01" min="0" max="1" placeholder="max">
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+// Init & Add Chain Groups
+function initChainGroup(grp){
+  ['iptm','ptm'].forEach(name=>{
+    initSlider(
+      grp.querySelector(`.chain-${name}-slider`),
+      grp.querySelector(`input[name="chain_${name}_min"]`),
+      grp.querySelector(`input[name="chain_${name}_max"]`),
+      {min:0,max:1,step:0.01,start:[0,1],key:name}
+    );
+  });
+}
+
+const container = document.getElementById('chain-container');
+container.insertAdjacentHTML('beforeend', chainTpl());
+initChainGroup(container.querySelector('.chain-group'));
+
+document.getElementById('add-chain').addEventListener('click', ()=>{
+  container.insertAdjacentHTML('beforeend', chainTpl());
+  initChainGroup(container.lastElementChild);
+});
+</script>
+{% endblock %}

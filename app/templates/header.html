@@ -1,0 +1,93 @@
+<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top">
+  <div class="container">
+    <a class="navbar-brand d-flex align-items-center" href="/">
+      <img src="/static/favicon-32.png" alt="AF3-DB" width="32" height="32" class="me-2">
+      <span class="fw-semibold">AF3-Complex-Database</span>
+    </a>
+
+    <button class="navbar-toggler" type="button"
+            data-bs-toggle="collapse" data-bs-target="#navMenu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav ms-auto align-items-center">
+        <li class="nav-item"><a class="nav-link" href="/">Home</a></li>
+        <li class="nav-item"><a class="nav-link" href="/faq">FAQ</a></li>
+        <li class="nav-item"><a class="nav-link" href="/advanced-search">Advanced&nbsp;Search</a></li>
+        <li class="nav-item"><a class="nav-link" href="/collections">Collections</a></li>
+        <li class="nav-item"><a class="nav-link" href="/download">Download</a></li>
+        <li class="nav-item"><a class="nav-link" href="/upload">Upload</a></li>
+        <li class="nav-item"><a class="nav-link" href="/api/docs" target="_blank">API</a></li>
+
+        <li class="nav-item ms-3 border-start ps-3">
+            <a class="nav-link position-relative text-secondary p-0" href="/cart" title="Selection Cart">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" class="bi bi-cart3" viewBox="0 0 16 16">
+                  <path d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .49.598l-1 5a.5.5 0 0 1-.465.401l-9.397.472L4.415 11H13a.5.5 0 0 1 0 1H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5M3.102 4l.835 6.397 9.176-.461L13.54 4zM5 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4m7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4m-7 1a1 1 0 1 1 0 2 1 1 0 0 1 0-2m7 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/>
+                </svg>
+                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-secondary" id="cart-badge" style="font-size: 0.65rem; display:none;">
+                    0
+                </span>
+            </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<script>
+/**
+ * Global Selection Cart Manager
+ * Stores accessions in localStorage key 'af3_cart'
+ */
+window.CartManager = {
+    KEY: 'af3_cart',
+
+    getAll() {
+        try {
+            const s = localStorage.getItem(this.KEY);
+            return s ? JSON.parse(s) : [];
+        } catch(e) { return []; }
+    },
+
+    add(acc) {
+        const list = this.getAll();
+        if(!list.includes(acc)) {
+            list.push(acc);
+            localStorage.setItem(this.KEY, JSON.stringify(list));
+            this.updateBadge();
+        }
+    },
+
+    remove(acc) {
+        let list = this.getAll();
+        list = list.filter(x => x !== acc);
+        localStorage.setItem(this.KEY, JSON.stringify(list));
+        this.updateBadge();
+    },
+
+    clear() {
+        localStorage.removeItem(this.KEY);
+        this.updateBadge();
+    },
+
+    updateBadge() {
+        const count = this.getAll().length;
+        const badge = document.getElementById('cart-badge');
+        if(badge) {
+            badge.textContent = count;
+            badge.style.display = count > 0 ? 'inline-block' : 'none';
+        }
+    }
+};
+
+
+document.addEventListener("DOMContentLoaded", () => {
+    window.CartManager.updateBadge();
+});
+
+
+window.addEventListener('cart-updated', () => {
+    window.CartManager.updateBadge();
+});
+</script>

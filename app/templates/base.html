@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}AF3-DB{% endblock %}</title>
+  <link href="/static/third-party/bootstrap-5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png">
+  <link rel="shortcut icon" href="/static/favicon.ico">
+  <style>
+  html, body { height: 100%; }
+  body       { display: flex; flex-direction: column; }
+  main       { flex: 1 0 auto; }
+  </style>
+  {% block head_extra %}{% endblock %}
+</head>
+<body class="bg-light">
+
+  {% include "header.html" %}
+
+  <main class="container my-4">
+    {% block content %}{% endblock %}
+  </main>
+
+  {% include "footer.html" %}
+
+  <script src="/static/third-party/bootstrap-5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  {% block scripts %}{% endblock %}
+
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    function pollProcessingStatus() {
+        const processingNodes = document.querySelectorAll('[data-processing-accession]');
+        if (processingNodes.length === 0) return;
+
+        const params = new URLSearchParams();
+        processingNodes.forEach(node => {
+            params.append("accessions", node.getAttribute("data-processing-accession"));
+        });
+
+        fetch(`/status?${params.toString()}`)
+            .then(response => response.json())
+            .then(data => {
+                let shouldReload = false;
+                for (const [acc, status] of Object.entries(data)) {
+                    if (status === "SUCCESS" || status === "FAILED") {
+                        shouldReload = true;
+                        break;
+                    }
+                }
+                if (shouldReload) {
+                    window.location.reload();
+                }
+            })
+            .catch(err => console.error("[POLL] Status check failed", err));
+    }
+
+
+    setInterval(pollProcessingStatus, 5000);
+});
+</script>
+</body>
+</html>

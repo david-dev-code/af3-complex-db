@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}About – AF3-DB{% endblock %}
+
+{% block head_extra %}
+  <meta name="robots" content="noindex">
+{% endblock %}
+
+{% block content %}
+<div class="bg-white p-4 shadow-sm">
+  <h1 class="h4 mb-3">About&nbsp;AF3‑DB</h1>
+
+  <p>
+    <strong>AF3‑DB</strong> is an open-source, self-hosted web application designed to archive, analyze, and share
+    structure models generated with <em>AlphaFold&nbsp;3</em> (© DeepMind).
+    Each entry comes with ipTM&nbsp;/ pTM&nbsp;/ pLDDT confidence scores,
+    downloadable mmCIF files, biophysical interaction metrics, and rich cross‑links to
+    <a href="https://www.uniprot.org/" target="_blank">UniProt&nbsp;/ UniParc</a>.
+  </p>
+
+  <h5 class="mt-4">Hosted by</h5>
+  <p class="mb-2">
+    This specific instance of AF3-DB is hosted and maintained by:
+  </p>
+  <ul>
+    <li><strong>{{ hoster_name | default('Local Administrator', true) }}</strong></li>
+    {% if hoster_email %}
+    <li>Contact: <a href="mailto:{{ hoster_email }}">{{ hoster_email }}</a></li>
+    {% endif %}
+  </ul>
+  {% if hoster_description %}
+  <p class="text-muted small">{{ hoster_description }}</p>
+  {% endif %}
+
+  <h5 class="mt-4">Software Developers (AF3 Complex Database Platform)</h5>
+  <p class="mb-2">
+    The underlying AF3-DB platform software was developed by:
+  </p>
+  <ul class="mb-2">
+    <li><strong>David Henne</strong> – Full stack development (idea, database, backend & UI)</li>
+    <li><strong>Ruslan Ibragimov</strong> – Foldseek integration</li>
+    <li><strong>Prof. Dr. Kay Hofmann</strong> – Group head, model contributions, testing</li>
+  </ul>
+  <p class="text-muted small">
+    University of Cologne. If you want to host your own instance, check out our GitHub repository.
+  </p>
+
+  <h5 class="mt-4">Technical stack</h5>
+  <ul class="mb-2">
+    <li><a href="https://github.com/fastapi" target="_blank"><strong>FastAPI</strong></a> &amp; <strong>SQLAlchemy</strong> – REST API, server‑side rendering, and database ORM</li>
+    <li><a href="https://getbootstrap.com/docs/5.0/getting-started/introduction/" target="_blank"><strong>Bootstrap&nbsp;5</strong></a> – layout & styling</li>
+    <li><a href="https://github.com/molstar/pdbe-molstar" target="_blank"><strong>PDBe Mol* 3.2</strong></a> – in‑browser molecular viewer</li>
+    <li><a href="https://search.foldseek.com" target="_blank"><strong>Foldseek API</strong></a> &amp; <strong>FoldDisco</strong> – structural similarity and interface motif search</li>
+    <li><strong>Biotite</strong> &amp; <strong>Pandas</strong> – structural parsing, biophysical property calculations, and data processing</li>
+  </ul>
+  <p class="text-muted small">
+    Protein sequences &amp; annotations are retrieved live from UniProt; Foldseek search results are streamed directly from search.foldseek.com.
+  </p>
+
+  <h5 class="mt-4">Attribution &amp; licences</h5>
+  <ul>
+    <li>AlphaFold&nbsp;3 © DeepMind – used under the
+        <a href="https://github.com/google-deepmind/alphafold3" target="_blank">
+        AlphaFold Licence</a>.</li>
+    <li>
+        PDBe Mol* 3.2 © EMBL‑EBI – licensed under the
+        <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank">
+          Apache License 2.0
+        </a>.
+    </li>
+    <li>Biotite, Pandas, FastAPI, SQLAlchemy – BSD/MIT Licences</li>
+    <li>noUiSlider 14.6.3 &amp; Bootstrap 5 – MIT Licence</li>
+    <li>All third‑party trademarks (UniProt, Foldseek, DeepMind) are property of their respective owners.</li>
+  </ul>
+  <p class="small text-muted mb-4">
+    We provide the models &amp; annotations “<em>as is</em>”.
+    No warranty is given for correctness or suitability for any purpose.
+    Please verify critical results independently.
+  </p>
+
+  <h5 class="mt-4">Issue Tracker &amp; Source Code</h5>
+  <p class="small">
+    Found a bug in the application logic, have a feature request, or want to host your own database?
+    Please open an issue or contribute on our GitHub page:<br>
+    <a href="https://github.com/TODO" target="_blank" class="fw-bold">github.com/TODO/AF3-DB</a>
+  </p>
+
+  <h5 class="mt-4 mb-1">How to cite&nbsp;AF3‑DB</h5>
+  <p class="small">
+    No dedicated publication yet.
+    If the database software was useful, please reference it informally as
+    “AF3‑DB (accessed {{ today }})”
+    and cite the original AlphaFold&nbsp;3 paper.
+  </p>
+</div>
+{% endblock %}

@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Home – AF3-DB{% endblock %}
+
+{% block content %}
+<div class="row mb-5">
+
+  <div class="col-12">
+    <h1 class="h4 mb-3">Welcome to AF3-DB</h1>
+    <p class="text-muted">
+      AF3-DB is a web server for the management, storage, and analysis of <strong>AlphaFold 3 protein complexes</strong> and their interactions.
+      Each entry includes confidence scores (ipTM, pTM, pLDDT),
+      downloadable mmCIF files, and automatic mappings to UniProt / UniParc.
+      Use the quick search below or switch to
+      <a href="/advanced-search">Advanced Search</a>.
+    </p>
+
+    <form id="quick-search-form" method="get" action="/quick-search"
+          class="input-group mb-2">
+      <input id="quick-search-input" name="q" type="text"
+             class="form-control form-control-lg"
+             placeholder="AF-CP-00007 | Q9XYZ1 | UPI000006C5A2 | sequence fragment | gene | protein | organism"
+             value="{{ query }}">
+      <button class="btn btn-outline-secondary" type="submit">Search</button>
+    </form>
+  </div>
+
+</div>
+
+<div class="row">
+  <div class="col-md-12">
+
+    {% if complexes %}
+      <h3 class="h6">Last submitted complexes</h3>
+      <table class="table table-striped bg-white shadow-sm w-100">
+        <thead class="table-light">
+          <tr>
+            <th style="width:15%">Accession</th>
+            <th style="width:25%">Genes</th>
+            <th style="width:35%">Proteins</th>
+            <th>Collection</th>
+            <th style="width:10%">ipTM</th>
+            <th style="width:10%">pTM</th>
+            <th style="width:5%">Chains</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in complexes %}
+          <tr {% if c.processing_status == 'PROCESSING' %}data-processing-accession="{{ c.accession }}"{% endif %}>
+            <td>
+              {% if c.processing_status == 'PROCESSING' %}
+                <span class="text-muted text-nowrap">
+                  <span class="spinner-border spinner-border-sm text-primary me-1" role="status" aria-hidden="true"></span>
+                  {{ c.accession }}
+                </span>
+                <span class="badge bg-warning text-dark ms-1">Processing</span>
+              {% elif c.processing_status == 'FAILED' %}
+                <span class="text-danger text-nowrap">{{ c.accession }}</span>
+                <span class="badge bg-danger ms-1">Failed</span>
+              {% else %}
+                <a href="/complex/{{ c.accession }}" class="fw-bold text-decoration-none">{{ c.accession }}</a>
+              {% endif %}
+            </td>
+
+            <td>
+              {% if c.processing_status == 'PROCESSING' %}
+                <span class="text-muted fst-italic small">Pending...</span>
+              {% else %}
+                {{ c.summary_genes }}
+              {% endif %}
+            </td>
+
+            <td>
+              {% if c.processing_status == 'PROCESSING' %}
+                <span class="text-muted fst-italic small">Pending...</span>
+              {% else %}
+                {{ c.summary_names }}
+              {% endif %}
+            </td>
+
+            <td class="text-nowrap">
+              {% if c.collection %}
+                <a href="/show_collection/{{ c.collection.name|urlencode }}"
+                   class="badge bg-secondary ms-1 text-decoration-none">{{ c.collection.name }}</a>
+              {% endif %}
+            </td>
+
+            <td>{{ c.iptm or '-' }}</td>
+            <td>{{ c.ptm  or '-' }}</td>
+            <td>{{ c.chains|length }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+    {% else %}
+      <div class="text-center py-5 bg-white border rounded shadow-sm">
+        <h4 class="text-muted mb-3">No complexes found</h4>
+        <p class="text-muted mb-4">The database is currently empty. Start by adding your AlphaFold 3 predictions.</p>
+        <div>
+          <a href="/upload" class="btn btn-primary me-3">Upload via Browser</a>
+          <span class="text-muted">or use the CLI: <code>af3-db upload-folder &lt;path&gt;</code></span>
+        </div>
+      </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Persist quick-search input across page reloads
+const qsInput  = document.getElementById('quick-search-input');
+const saved    = localStorage.getItem('quickSearch');
+if (saved !== null) qsInput.value = saved;
+qsInput.addEventListener('input', e => {
+  localStorage.setItem('quickSearch', e.target.value);
+});
+</script>
+{% endblock %}

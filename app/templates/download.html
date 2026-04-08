@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Download Center – AF3‑DB{% endblock %}
+
+{% block content %}
+<h1 class="h4 mb-4">Download Center</h1>
+
+<p class="text-muted">
+  Get the entire AF3‑Complex-Database in one archive.
+</p>
+
+<!-- Download‑Buttons ---->
+<div class="d-grid gap-3 col-12 col-md-6 mx-auto my-4">
+  <a href="/download/everything?part=cif"
+     class="btn btn-outline-primary btn-sm">
+     only&nbsp;<code>model.cif (ZIP)</code>
+  </a>
+
+  <a href="/download/everything?part=confidences"
+     class="btn btn-outline-primary btn-sm">
+     only&nbsp;<code>confidences.json (ZIP)</code>
+  </a>
+
+  <a href="/download/everything?part=all"
+     class="btn btn-primary btn-sm fw-bold">
+     models and confidences (ZIP)
+  </a>
+</div>
+
+
+<hr class="my-4">
+
+<h6 class="mb-2">Metadata Export of the complete Database</h6>
+<a href="/download/complex_table.csv"
+   class="btn btn-sm btn-outline-success">
+  ⬇ Complex‑Table (.csv)
+</a>
+<br>
+<br>
+<p class="small text-muted">
+  <strong>Note:</strong> The archives may be several&nbsp;GB in size.
+  If you only need a subset (e.g.&nbsp;a single collection or search
+  result), please use the download buttons on the respective pages.
+</p>
+{% endblock %}

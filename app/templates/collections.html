@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Collections – AF3-DB{% endblock %}
+
+{% block content %}
+<h2 class="h5 mb-3">All Collections</h2>
+
+{% if rows %}
+<table class="table table-hover bg-white shadow-sm">
+  <thead class="table-light">
+    <tr>
+      <th>Name</th>
+      <th># Complexes</th>
+    </tr>
+  </thead>
+
+
+
+  <tbody>
+  {% for id, name, n in rows %}
+    <tr>
+      <td><a href="/show_collection/{{ name }}">{{ name }}</a></td>
+      <td>
+        {% if n %}
+          <a href="/show_collection/{{ name }}">{{ n }}</a>
+        {% else %}
+          0
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+  <div class="alert alert-info">No collections yet.</div>
+{% endif %}
+{% endblock %}

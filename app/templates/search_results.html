@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Search Results – AF3-DB{% endblock %}
+
+{% block content %}
+<h2 class="h5 mb-3">Search results</h2>
+
+{% if params.get("q") %}
+  <p class="text-muted mb-2">
+    Query:
+    <code>{{ params.get("q") }}</code>
+  </p>
+{% endif %}
+
+{% include "_results_table.html" %}
+
+{% endblock %}

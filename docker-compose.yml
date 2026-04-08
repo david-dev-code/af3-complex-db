@@ -1,0 +1,59 @@
+name: af3-db
+
+services:
+  db:
+    image: ankane/pgvector:latest
+    container_name: af3db_postgres
+    restart: ${RESTART_POLICY}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}"]
+      interval: 2s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      network: host
+    container_name: af3db_fastapi
+    restart: ${RESTART_POLICY}
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - HOSTER_NAME=${HOSTER_NAME}
+      - HOSTER_EMAIL=${HOSTER_EMAIL}
+      - HOSTER_DESCRIPTION=${HOSTER_DESCRIPTION}
+      - STORAGE_ROOT=/app/storage_root
+    volumes:
+      - ${STORAGE_PATH}:/app/storage_root
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: af3db_caddy
+    restart: ${RESTART_POLICY}
+    ports:
+      - "${APP_PORT}:${APP_PORT}"
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME}
+      - APP_PORT=${APP_PORT}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ${INSTALL_DIR}/caddy_data:/data
+      - ${INSTALL_DIR}/caddy_config:/config
+    depends_on:
+      web:
+        condition: service_started
+
+volumes:
+  postgres_data:

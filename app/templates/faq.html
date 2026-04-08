@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+
+{% block title %}FAQ – AF3-Complex-DB{% endblock %}
+
+{% block content %}
+<div class="bg-white p-4 shadow-sm border rounded">
+  <h1 class="h4 mb-4">Frequently Asked Questions</h1>
+
+  <div class="accordion" id="faqAccordion">
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="faqHeading1">
+        <button class="accordion-button" type="button" data-bs-toggle="collapse"
+                data-bs-target="#faqCollapse1" aria-expanded="true">
+          How do I upload my AlphaFold 3 outputs?
+        </button>
+      </h2>
+      <div id="faqCollapse1" class="accordion-collapse collapse show"
+           data-bs-parent="#faqAccordion">
+        <div class="accordion-body">
+          <p>You have two ways to upload data into the database:</p>
+          <ul>
+            <li><strong>Via Web Browser:</strong> Go to the <a href="/upload">Upload</a> page, select a <code>.zip</code> archive containing your AF3 result files, and submit. Best for single runs.</li>
+            <li><strong>Via Command Line (CLI):</strong> If you have server access, use our powerful CLI tool. You can upload entire directories of outputs simultaneously, assign them to collections, and even use symlinks to save disk space. Example: <code>af3-db upload-folder /path/to/results --collection "My Project"</code>.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="faqHeading2">
+        <button class="accordion-button collapsed" type="button"
+                data-bs-toggle="collapse" data-bs-target="#faqCollapse2">
+          How are protein chains mapped to UniProt IDs?
+        </button>
+      </h2>
+      <div id="faqCollapse2" class="accordion-collapse collapse"
+           data-bs-parent="#faqAccordion">
+        <div class="accordion-body">
+          <p>During the background processing phase, the system identifies chains using one of two strategies:</p>
+          <ul>
+            <li><strong>Automatic (Sequence Search):</strong> The exact amino acid sequence of each chain is queried against the UniParc/UniProt databases to find matching entries automatically.</li>
+            <li><strong>Filename Pattern:</strong> If your output folders follow a strict naming convention (e.g., <code>P12345_Q98765_model</code>), you can provide a Regex-like pattern (like <code>{A}_{B}</code>) during upload. The system will then force-map Chain A to P12345 and Chain B to Q98765.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="faqHeading3">
+        <button class="accordion-button collapsed" type="button"
+                data-bs-toggle="collapse" data-bs-target="#faqCollapse3">
+          Which scores and biophysical metrics are calculated?
+        </button>
+      </h2>
+      <div id="faqCollapse3" class="accordion-collapse collapse"
+           data-bs-parent="#faqAccordion">
+        <div class="accordion-body">
+          In addition to parsing the native AlphaFold 3 confidence scores (<strong>ipTM, pTM, pLDDT, ranking_score</strong>), the backend automatically runs a biophysical analysis on the 3D structure (<code>.cif</code> file). This includes:
+          <ul>
+            <li><strong>Buried Surface Area (BSA):</strong> The interface area between interacting chains.</li>
+            <li><strong>Hydrogen Bonds & Salt Bridges:</strong> Counting specific interactions across the interface.</li>
+            <li><strong>ipSAE & PDockQ:</strong> Advanced interface quality and docking metrics derived from the model coordinates.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="faqHeading4">
+        <button class="accordion-button collapsed" type="button"
+                data-bs-toggle="collapse" data-bs-target="#faqCollapse4">
+          What can I do with the Advanced Search?
+        </button>
+      </h2>
+      <div id="faqCollapse4" class="accordion-collapse collapse"
+           data-bs-parent="#faqAccordion">
+        <div class="accordion-body">
+          The <a href="/advanced-search">Advanced Search</a> allows highly granular filtering:
+          <ul>
+            <li>Filter by specific <strong>score thresholds</strong> using interactive sliders (e.g., only show complexes with ipTM > 0.8).</li>
+            <li>Filter by <strong>oligomeric state</strong> (Monomer, Homomer, Heteromer).</li>
+            <li>Add <strong>chain-specific blocks</strong>: You can enforce that a complex must contain a chain matching a specific UniProt ID <em>AND</em> another chain matching a specific gene name.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="faqHeading5">
+        <button class="accordion-button collapsed" type="button"
+                data-bs-toggle="collapse" data-bs-target="#faqCollapse5">
+          What are Collections?
+        </button>
+      </h2>
+      <div id="faqCollapse5" class="accordion-collapse collapse"
+           data-bs-parent="#faqAccordion">
+        <div class="accordion-body">
+          Collections allow you to group multiple uploads logically (e.g., "Kinase Screen Q3"). Viewing a collection provides aggregated statistics, species distribution charts, scatter plots (like ipTM vs. pTM), and the ability to download the entire dataset as a single bulk ZIP archive.
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="faqHeading6">
+        <button class="accordion-button collapsed" type="button"
+                data-bs-toggle="collapse" data-bs-target="#faqCollapse6">
+          What licence applies to models and metadata?
+        </button>
+      </h2>
+      <div id="faqCollapse6" class="accordion-collapse collapse"
+           data-bs-parent="#faqAccordion">
+        <div class="accordion-body">
+          The structural models inherit the <strong>AlphaFold 3 Terms & Conditions</strong> issued by DeepMind: they are generally free for <strong>non‑commercial research only</strong> and must be credited accordingly. Sequence annotations from UniProt are redistributed under CC BY 4.0. No warranty is given for correctness. If licence texts differ, the original AlphaFold 3 Terms & Conditions always take precedence.
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="faqHeading7">
+        <button class="accordion-button collapsed" type="button"
+                data-bs-toggle="collapse" data-bs-target="#faqCollapse7">
+          Which browsers are supported?
+        </button>
+      </h2>
+      <div id="faqCollapse7" class="accordion-collapse collapse"
+           data-bs-parent="#faqAccordion">
+        <div class="accordion-body">
+          We test AF3-Complex-DB on Chrome, Firefox and Safari. For smooth 3D rendering in the Mol* viewer on the detail pages, your browser must support WebGL 2.
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="faqHeading8">
+        <button class="accordion-button collapsed" type="button"
+                data-bs-toggle="collapse" data-bs-target="#faqCollapse8">
+          I found a bug – how can I report it?
+        </button>
+      </h2>
+      <div id="faqCollapse8" class="accordion-collapse collapse"
+           data-bs-parent="#faqAccordion">
+        <div class="accordion-body">
+          Please report bugs, suggest features, or contribute code by opening an issue on our <a href="#" target="_blank">GitHub Repository</a>. Include the error message and the steps to reproduce the issue.
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="faqHeading9">
+        <button class="accordion-button collapsed" type="button"
+                data-bs-toggle="collapse" data-bs-target="#faqCollapse9">
+          Why can I access the database, but my colleagues cannot?
+        </button>
+      </h2>
+      <div id="faqCollapse9" class="accordion-collapse collapse"
+           data-bs-parent="#faqAccordion">
+        <div class="accordion-body">
+          This is usually related to local network or firewall settings. If the server is running on your machine or a restricted university/company server, other computers might be blocked from accessing the specific port (e.g., 3000 or 443). Ensure that the firewall allows incoming connections to the configured port and that your colleagues are connected to the same local network or VPN.
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="faqHeading10">
+        <button class="accordion-button collapsed" type="button"
+                data-bs-toggle="collapse" data-bs-target="#faqCollapse10">
+          Is the database publicly accessible?
+        </button>
+      </h2>
+      <div id="faqCollapse10" class="accordion-collapse collapse"
+           data-bs-parent="#faqAccordion">
+        <div class="accordion-body">
+          By default, no. The application is designed to run securely within your local network (LAN) or a virtual private network (VPN). It is only accessible to users who have network access to the host machine. Public internet access depends entirely on how your IT department or the person hosting the database configures the server routing.
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="faqHeading11">
+        <button class="accordion-button collapsed" type="button"
+                data-bs-toggle="collapse" data-bs-target="#faqCollapse11">
+          Why does my browser show an "insecure connection" warning?
+        </button>
+      </h2>
+      <div id="faqCollapse11" class="accordion-collapse collapse"
+           data-bs-parent="#faqAccordion">
+        <div class="accordion-body">
+          If you opted to use local HTTPS during installation, the system uses a self-signed SSL certificate. Browsers display a "Not Secure" or "Your connection is not private" warning because the certificate was generated locally, not by a recognized public authority. This is completely normal and safe for local networks. You can usually bypass this warning by clicking "Advanced" and proceeding to the site.
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="faqHeading12">
+        <button class="accordion-button collapsed" type="button"
+                data-bs-toggle="collapse" data-bs-target="#faqCollapse12">
+          How do I completely uninstall AF3-DB?
+        </button>
+      </h2>
+      <div id="faqCollapse12" class="accordion-collapse collapse"
+           data-bs-parent="#faqAccordion">
+        <div class="accordion-body">
+          To remove the application, simply run the <code>uninstall.py</code> script located in your main installation folder. This script will safely stop and remove the Docker containers, unbind the CLI commands, and give you the option to permanently delete the PostgreSQL database and all uploaded structural files.
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="faqHeading13">
+        <button class="accordion-button collapsed" type="button"
+                data-bs-toggle="collapse" data-bs-target="#faqCollapse13">
+          Why do I need a password for uploads and modifications?
+        </button>
+      </h2>
+      <div id="faqCollapse13" class="accordion-collapse collapse"
+           data-bs-parent="#faqAccordion">
+        <div class="accordion-body">
+          To protect the integrity of your database. While anyone with the link can view, search, and download the complexes, actions that modify the database (like uploading new bundles, deleting complexes, or managing collections) are restricted. The administrator sets this password during the initial installation process via the <code>install.py</code> script.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
