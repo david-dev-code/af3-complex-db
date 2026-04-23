@@ -70,7 +70,7 @@ af3-db upload-folder /path/to/results --collection "Kinase Project Q3"
 ```
 
 **Upload with Custom Chain Mapping (Regex):**
-If your files are named systematically (e.g., `P12345_Q98765_model.cif`), you can force the database to map specific chains to specific UniProt accessions using the `--pattern` argument:
+If your alphafold run-folders are named systematically (e.g., `P12345_Q98765`), you can tell the database to map specific chains to specific UniProt accessions using the `--pattern` argument:
 ```bash
 af3-db upload-folder /path/to/results --pattern "{A}_{B}"
 ```
