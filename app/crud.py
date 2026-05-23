@@ -35,28 +35,6 @@ def _next_accession(db: Session) -> str:
     return f"AF-CP-{idx:05d}"
 
 
-def _store_file(folder: Path, filename: str, raw: bytes) -> str:
-    """Saves raw bytes to a file and returns the relative path from storage root."""
-    folder.mkdir(parents=True, exist_ok=True)
-    path = folder / filename
-    path.write_bytes(raw)
-    return str(path.relative_to(settings.storage_root))
-
-
-def get_cif_path_by_accession(db: Session, accession: str) -> Path | None:
-    """
-    Returns the absolute path to the `model.cif` file of the specified Complex,
-    or None if the complex does not exist.
-    """
-    rel_path = (
-        db.query(models.Complex.file_path)
-        .filter(models.Complex.accession == accession)
-        .scalar()
-    )
-    if rel_path is None:
-        return None
-    return Path(settings.storage_root) / rel_path / "model.cif"
-
 
 def add_chain_mappings(db: Session, chain: Chain, upi: str, accessions: list[str]) -> None:
     """
@@ -163,34 +141,6 @@ def _determine_best_entry(chain: models.Chain) -> tuple[str | None, str | None, 
     return best_ua.accession, best_ua.protein_name, best_ua.gene_name
 
 
-def _best_protein_name(chain: models.Chain) -> str:
-    """
-    Deterministically returns the 'best' protein name for a chain based on its mappings.
-    Falls back to UPI or '–'.
-    """
-    counts = Counter()
-    reviewed = defaultdict(bool)
-
-    accessions = chain.uniparc.accessions if chain.uniparc else []
-    for ua in accessions:
-        if ua.protein_name:
-            counts[ua.protein_name] += 1
-            if ua.status and REVIEWED_FLAG in ua.status:
-                reviewed[ua.protein_name] = True
-
-    if counts:
-        max_freq = max(counts.values())
-        candidates = [n for n, c in counts.items() if c == max_freq]
-
-        reviewed_cands = [n for n in candidates if reviewed[n]]
-        if reviewed_cands:
-            candidates = reviewed_cands
-
-        return sorted(candidates)[0]
-
-    return chain.uniparc.upi if chain.uniparc else "–"
-
-
 # Main Logic
 
 def update_complex_full(
@@ -249,8 +199,7 @@ def update_complex_full(
     db.commit()
     db.refresh(comp)
 
-    # Reattach virtual summary attributes
-    from app.crud import _attach_summary_names
+
     _attach_summary_names([comp])
 
     return comp
@@ -498,57 +447,6 @@ def process_complex_background(
         print(f"[BACKGROUND] Fatal Error processing {complex_id}: {e}", flush=True)
         traceback.print_exc()
 
-
-def _organism_rank(org: str | None) -> int:
-    """Returns an integer rank. Lower value = higher priority."""
-    return PRIO_ORG.get(org or "", 3)
-
-
-def _best_gene_name(chain: models.Chain) -> str:
-    """
-    Determines the best gene name for a chain based on mapping metadata.
-    Priority logic:
-    1. Most frequent gene name.
-    2. LOC... genes are deprioritized.
-    3. Organism priority (Human < Mouse < Fly < Rest).
-    4. Reviewed entries preferred.
-    5. Alphabetical fallback.
-    Returns the selected gene name, UPI, or '–'.
-    """
-    counts = Counter()
-    reviewed = defaultdict(bool)
-    best_org = defaultdict(lambda: 3)
-
-    accessions = chain.uniparc.accessions if chain.uniparc else []
-    for ua in accessions:
-        if ua.gene_name:
-            g = ua.gene_name
-            counts[g] += 1
-            if ua.status and REVIEWED_FLAG in ua.status:
-                reviewed[g] = True
-            best_org[g] = min(best_org[g], _organism_rank(ua.organism))
-
-    if not counts:
-        return chain.uniparc.upi if chain.uniparc else "–"
-
-    # 1. Most frequent
-    max_freq = max(counts.values())
-    cand = [g for g, c in counts.items() if c == max_freq]
-
-    # 2. Deprioritize LOC genes
-    non_loc = [g for g in cand if not g.startswith("LOC")]
-    cand = non_loc or cand
-
-    # 3. Organism ranking
-    min_rank = min(best_org[g] for g in cand)
-    cand = [g for g in cand if best_org[g] == min_rank]
-
-    # 4. Prefer reviewed
-    rev_cand = [g for g in cand if reviewed[g]]
-    cand = rev_cand or cand
-
-    # 5. Alphabetical sort
-    return sorted(cand)[0]
 
 
 # Complex Retrievals & Computations
@@ -1193,24 +1091,6 @@ def search_advanced_radius_sort(
         page=page, per_page=per_page, desc_flag=desc_flag
     )
 
-
-def search_quick_radius_sort(
-        db: Session,
-        q: str,
-        *,
-        center_res: int,
-        radius: float,
-        chain_letter: str | None,
-        page: int,
-        per_page: int,
-        desc_flag: bool = True,
-):
-    """Radius sort specifically for Quick Search."""
-    accs = accessions_for_quick_search(db, q)
-    return radius_sort_over_accessions(
-        db, accs, center_res=center_res, radius=radius, chain_letter=chain_letter,
-        page=page, per_page=per_page, desc_flag=desc_flag
-    )
 
 
 def search_collection_radius_sort(
