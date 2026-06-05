@@ -17,7 +17,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module="biotite")
 def compute_biophysical_stats(cif_path: Path) -> Tuple[List[dict], Dict[str, List[int]]]:
     """
     Computes biophysical properties for a given CIF structure.
-    Calculates BSA, heavy-atom hydrogen bonds, salt bridges, and interface residues.
+    Calculates BSA, proxy for H-bonds, salt bridges, and interface residues.
     """
     settings = get_settings()
     print(f"[BIOPHYS] Loading structure from {cif_path}", flush=True)
@@ -69,26 +69,41 @@ def compute_biophysical_stats(cif_path: Path) -> Tuple[List[dict], Dict[str, Lis
             num_h_bonds = 0
             if len(c1_polar) > 0 and len(c2_polar) > 0:
                 d_polar = cdist(c1_polar.coord, c2_polar.coord)
-                num_h_bonds = np.count_nonzero(d_polar <= settings.threshold_h_bond)
+                contact_indices = np.argwhere(d_polar <= settings.threshold_h_bond)
+                unique_h_bond_pairs = set()
+                for idx1, idx2 in contact_indices:
+                    res1 = c1_polar.res_id[idx1]
+                    res2 = c2_polar.res_id[idx2]
+                    unique_h_bond_pairs.add((res1, res2))
+                num_h_bonds = len(unique_h_bond_pairs)
 
-            def get_sb_coords(atoms):
+            def get_sb_data(atoms):
+                """Extracts coordinates and residue IDs for salt bridge calculations."""
                 mask_a = ((atoms.res_name == "ASP") & np.isin(atoms.atom_name, ["OD1", "OD2"])) | \
                          ((atoms.res_name == "GLU") & np.isin(atoms.atom_name, ["OE1", "OE2"]))
                 mask_c = ((atoms.res_name == "LYS") & (atoms.atom_name == "NZ")) | \
                          ((atoms.res_name == "ARG") & np.isin(atoms.atom_name, ["NH1", "NH2"])) | \
                          ((atoms.res_name == "HIS") & np.isin(atoms.atom_name, ["ND1", "NE2"]))
-                return atoms.coord[mask_a], atoms.coord[mask_c]
+                return atoms[mask_a], atoms[mask_c]
 
-            c1_an, c1_cat = get_sb_coords(atoms1)
-            c2_an, c2_cat = get_sb_coords(atoms2)
+            c1_an_atoms, c1_cat_atoms = get_sb_data(atoms1)
+            c2_an_atoms, c2_cat_atoms = get_sb_data(atoms2)
 
-            num_salt = 0
-            if len(c1_an) > 0 and len(c2_cat) > 0:
-                d = cdist(c1_an, c2_cat)
-                num_salt += np.count_nonzero(d < settings.threshold_salt_bridge)
-            if len(c1_cat) > 0 and len(c2_an) > 0:
-                d = cdist(c1_cat, c2_an)
-                num_salt += np.count_nonzero(d < settings.threshold_salt_bridge)
+            unique_salt_bridges = set()
+
+            if len(c1_an_atoms) > 0 and len(c2_cat_atoms) > 0:
+                d = cdist(c1_an_atoms.coord, c2_cat_atoms.coord)
+                contact_indices = np.argwhere(d < settings.threshold_salt_bridge)
+                for idx1, idx2 in contact_indices:
+                    unique_salt_bridges.add((c1_an_atoms.res_id[idx1], c2_cat_atoms.res_id[idx2]))
+
+            if len(c1_cat_atoms) > 0 and len(c2_an_atoms) > 0:
+                d = cdist(c1_cat_atoms.coord, c2_an_atoms.coord)
+                contact_indices = np.argwhere(d < settings.threshold_salt_bridge)
+                for idx1, idx2 in contact_indices:
+                    unique_salt_bridges.add((c1_cat_atoms.res_id[idx1], c2_an_atoms.res_id[idx2]))
+
+            num_salt = len(unique_salt_bridges)
 
             dists = cdist(atoms1.coord, atoms2.coord)
             min_dist_global = dists.min() if dists.size > 0 else 999.0
