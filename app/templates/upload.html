@@ -252,8 +252,13 @@ form.addEventListener('submit', e=>{
         statusBox.innerHTML=`<div class="alert alert-danger">${r.detail}</div>`;
       }
     }else{
-      statusBox.innerHTML=`<div class="alert alert-danger">
-        Errors in evaluation – pay attention to correct form</div>`;
+      try {
+        const r = JSON.parse(xhr.responseText);
+        statusBox.innerHTML=`<div class="alert alert-danger">${r.detail || "Upload failed."}</div>`;
+      } catch(e) {
+        statusBox.innerHTML=`<div class="alert alert-danger">
+          Errors in evaluation – pay attention to correct form</div>`;
+      }
     }
   };
 

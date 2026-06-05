@@ -765,6 +765,9 @@ def accessions_for_quick_search(db: Session, q: str) -> list[str]:
 # Advanced Search Accession Fetcher
 
 def accessions_for_advanced_search(db: Session, qp) -> list[str]:
+    """
+    Retrieves a list of complex accessions based on advanced search parameters.
+    """
     def _flt(key):
         return float(qp[key]) if key in qp and qp[key] else None
 
@@ -793,7 +796,7 @@ def accessions_for_advanced_search(db: Session, qp) -> list[str]:
     cc_min, cc_max = _int("chain_count_min"), _int("chain_count_max")
     oli_state = qp.get("oligomeric_state")
 
-    if cc_min or cc_max or oli_state in ("monomer", "homomer", "heteromer"):
+    if cc_min or cc_max or oli_state in ("homomer", "heteromer"):
         subc = (
             select(
                 models.Chain.complex_id,
@@ -806,9 +809,7 @@ def accessions_for_advanced_search(db: Session, qp) -> list[str]:
         stmt = stmt.join(subc, models.Complex.id == subc.c.complex_id)
         _range(subc.c.cc, cc_min, cc_max)
 
-        if oli_state == "monomer":
-            filters.append(subc.c.cc == 1)
-        elif oli_state == "homomer":
+        if oli_state == "homomer":
             filters.append(and_(subc.c.cc > 1, subc.c.distinct_seqs == 1))
         elif oli_state == "heteromer":
             filters.append(subc.c.distinct_seqs > 1)
@@ -856,6 +857,9 @@ def search_advanced(
         sort: str | None = None,
         desc_flag: bool = True,
 ):
+    """
+    Executes an advanced search with pagination and sorting support.
+    """
     stmt = select(models.Complex)
     filters = []
 
@@ -882,7 +886,7 @@ def search_advanced(
         except ValueError:
             pass
 
-    if adv.chain_count_min or adv.chain_count_max or oligomeric_state in ("monomer", "homomer", "heteromer"):
+    if adv.chain_count_min or adv.chain_count_max or oligomeric_state in ("homomer", "heteromer"):
         subc = (
             select(
                 models.Chain.complex_id,
@@ -894,9 +898,7 @@ def search_advanced(
         )
         stmt = stmt.join(subc, models.Complex.id == subc.c.complex_id)
         _range(subc.c.cc, adv.chain_count_min, adv.chain_count_max)
-        if oligomeric_state == "monomer":
-            filters.append(subc.c.cc == 1)
-        elif oligomeric_state == "homomer":
+        if oligomeric_state == "homomer":
             filters.append(and_(subc.c.cc > 1, subc.c.uc == 1))
         elif oligomeric_state == "heteromer":
             filters.append(subc.c.uc > 1)
@@ -942,7 +944,7 @@ def search_advanced(
         .joinedload(models.Chain.uniparc)
         .joinedload(models.UniParcEntry.accessions),
         joinedload(models.Complex.collection),
-        joinedload(models.Complex.interface_scores) # UI FIX
+        joinedload(models.Complex.interface_scores)
     )
     result = db.scalars(stmt).unique().all()
     return _attach_summary_names(result)

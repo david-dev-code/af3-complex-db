@@ -95,7 +95,8 @@ async def submit_complex(
 ):
     """
     Internal logic to process the uploaded ZIP bundle.
-    Extracts files, creates DB entries, and delegates heavy parsing to a background task.
+    Extracts and validates files, creates initial DB entries,
+    and delegates heavy parsing to a background task.
     """
     print(f"[API] submit_complex: from={submitted_from!r} bundle={getattr(bundle, 'filename', None)!r} fallback_only={mapping_fallback_only}", flush=True)
 
@@ -191,6 +192,10 @@ async def submit_complex(
             if cif_name is None:
                 raise ValueError(f"No .cif found in {path}")
 
+            chain_ids = parser.get_chain_ids()
+            if len(chain_ids) < 2:
+                raise ValueError(f"Monomers are not allowed. Folder '{path.name}' contains only {len(chain_ids)} chain.")
+
             cif_bytes = cif_name.read_bytes()
             conf_bytes = conf_name.read_bytes() if conf_name else None
 
@@ -281,6 +286,8 @@ async def submit_complex(
                 continue
 
         if not complexes:
+            if skipped > 0:
+                raise HTTPException(status_code=400, detail=f"No valid complexes found. Skipped {skipped} folder(s) (e.g. Monomers).")
             raise HTTPException(status_code=400, detail="No valid AlphaFold output found in ZIP")
 
         response.headers["X-Skipped"] = str(skipped)

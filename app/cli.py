@@ -220,6 +220,10 @@ def _ingest_single_run(
 
     if not cif_name: raise ValueError("No CIF found")
 
+    chain_ids = parser.get_chain_ids()
+    if len(chain_ids) < 2:
+        raise ValueError(f"Monomers are not allowed. Run contains only {len(chain_ids)} chain.")
+
     cif_bytes = cif_name.read_bytes()
     conf_bytes = conf_name.read_bytes() if conf_name else None
 
