@@ -95,7 +95,7 @@ After starting the server, open your web browser and navigate to the address pro
 **Advanced Search:**
 Navigate to the "Advanced Search" tab to perform highly granular queries:
 - Filter by ipTM, pTM, or pLDDT score ranges using interactive sliders.
-- Filter by Oligomeric State (Monomer, Homomer, Heteromer).
+- Filter by Oligomeric State (Homomer, Heteromer).
 - **Chain Filters:** Add specific conditions for individual chains within a complex (e.g., "Chain A must match 'Human Kinase' AND have an ipTM > 0.8").
 
 **Collections:**
