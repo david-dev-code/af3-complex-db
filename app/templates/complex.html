@@ -120,11 +120,11 @@
       {{ "%.1f"|format(c.bsa) if c.bsa is not none else "–" }}
     </li>
     <li class="list-inline-item border-end pe-2">
-      <span data-bs-toggle="tooltip" title="Number of Hydrogen Bonds">H-Bonds</span>:
+      <span data-bs-toggle="tooltip" title="Number of putative (distance-inferred) Hydrogen Bonds">H-Bonds</span>:
       {{ c.num_h_bonds if c.num_h_bonds is not none else "–" }}
     </li>
     <li class="list-inline-item border-end pe-2">
-      <span data-bs-toggle="tooltip" title="Number of Salt Bridges">Salt Bridges</span>:
+      <span data-bs-toggle="tooltip" title="Number of distance-inferred inter-chain salt bridges">Salt Bridges</span>:
       {{ c.num_salt_bridges if c.num_salt_bridges is not none else "–" }}
     </li>
 

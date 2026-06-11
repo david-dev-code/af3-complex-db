@@ -66,8 +66,8 @@
     <div class="mb-2"><strong>Biophysics</strong></div>
     {% set biophys_opts = [
       ("bsa", "Buried Surface Area (BSA)"),
-      ("num_h_bonds", "Hydrogen Bonds"),
-      ("num_salt_bridges", "Salt Bridges"),
+      ("num_h_bonds", "Putative H-Bonds"),
+      ("num_salt_bridges", "Inter-chain Salt Bridges"),
     ] %}
     <div class="vstack gap-2 mb-3">
       {% for key, label in biophys_opts %}

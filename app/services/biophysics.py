@@ -17,7 +17,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module="biotite")
 def compute_biophysical_stats(cif_path: Path) -> Tuple[List[dict], Dict[str, List[int]]]:
     """
     Computes biophysical properties for a given CIF structure.
-    Calculates BSA, proxy for H-bonds, salt bridges, and interface residues.
+    Calculates BSA, polar contacts (proxy for H-bonds), salt bridges, and interface residues.
     """
     settings = get_settings()
     print(f"[BIOPHYS] Loading structure from {cif_path}", flush=True)
@@ -63,6 +63,7 @@ def compute_biophysical_stats(cif_path: Path) -> Tuple[List[dict], Dict[str, Lis
             sasa_complex = _calc_sasa(complex_ab)
             bsa_val = max(0.0, (sasa_1 + sasa_2 - sasa_complex) / 2.0)
 
+            #Polar Contacts (H-Bond Proxy)
             c1_polar = atoms1[np.isin(atoms1.element, ["N", "O"])]
             c2_polar = atoms2[np.isin(atoms2.element, ["N", "O"])]
 
@@ -70,20 +71,23 @@ def compute_biophysical_stats(cif_path: Path) -> Tuple[List[dict], Dict[str, Lis
             if len(c1_polar) > 0 and len(c2_polar) > 0:
                 d_polar = cdist(c1_polar.coord, c2_polar.coord)
                 contact_indices = np.argwhere(d_polar <= settings.threshold_h_bond)
+
                 unique_h_bond_pairs = set()
                 for idx1, idx2 in contact_indices:
-                    res1 = c1_polar.res_id[idx1]
-                    res2 = c2_polar.res_id[idx2]
-                    unique_h_bond_pairs.add((res1, res2))
+                    if c1_polar.element[idx1] == "O" and c2_polar.element[idx2] == "O":
+                        continue
+                    unique_h_bond_pairs.add((idx1, idx2))
                 num_h_bonds = len(unique_h_bond_pairs)
 
+            # Salt Bridges:
             def get_sb_data(atoms):
-                """Extracts coordinates and residue IDs for salt bridge calculations."""
+                """Extracts anionic and cationic atoms for salt bridge calculations."""
                 mask_a = ((atoms.res_name == "ASP") & np.isin(atoms.atom_name, ["OD1", "OD2"])) | \
                          ((atoms.res_name == "GLU") & np.isin(atoms.atom_name, ["OE1", "OE2"]))
+
                 mask_c = ((atoms.res_name == "LYS") & (atoms.atom_name == "NZ")) | \
-                         ((atoms.res_name == "ARG") & np.isin(atoms.atom_name, ["NH1", "NH2"])) | \
-                         ((atoms.res_name == "HIS") & np.isin(atoms.atom_name, ["ND1", "NE2"]))
+                         ((atoms.res_name == "ARG") & np.isin(atoms.atom_name, ["NH1", "NH2"]))
+
                 return atoms[mask_a], atoms[mask_c]
 
             c1_an_atoms, c1_cat_atoms = get_sb_data(atoms1)
@@ -93,13 +97,13 @@ def compute_biophysical_stats(cif_path: Path) -> Tuple[List[dict], Dict[str, Lis
 
             if len(c1_an_atoms) > 0 and len(c2_cat_atoms) > 0:
                 d = cdist(c1_an_atoms.coord, c2_cat_atoms.coord)
-                contact_indices = np.argwhere(d < settings.threshold_salt_bridge)
+                contact_indices = np.argwhere(d <= settings.threshold_salt_bridge)
                 for idx1, idx2 in contact_indices:
                     unique_salt_bridges.add((c1_an_atoms.res_id[idx1], c2_cat_atoms.res_id[idx2]))
 
             if len(c1_cat_atoms) > 0 and len(c2_an_atoms) > 0:
                 d = cdist(c1_cat_atoms.coord, c2_an_atoms.coord)
-                contact_indices = np.argwhere(d < settings.threshold_salt_bridge)
+                contact_indices = np.argwhere(d <= settings.threshold_salt_bridge)
                 for idx1, idx2 in contact_indices:
                     unique_salt_bridges.add((c1_cat_atoms.res_id[idx1], c2_an_atoms.res_id[idx2]))
 
@@ -109,9 +113,9 @@ def compute_biophysical_stats(cif_path: Path) -> Tuple[List[dict], Dict[str, Lis
             min_dist_global = dists.min() if dists.size > 0 else 999.0
 
             min_dists_1 = dists.min(axis=1)
-            contact_mask_1 = min_dists_1 < settings.threshold_interface
+            contact_mask_1 = min_dists_1 <= settings.threshold_interface
             min_dists_2 = dists.min(axis=0)
-            contact_mask_2 = min_dists_2 < settings.threshold_interface
+            contact_mask_2 = min_dists_2 <= settings.threshold_interface
 
             res_ids_1 = np.unique(atoms1.res_id[contact_mask_1]).tolist()
             res_ids_2 = np.unique(atoms2.res_id[contact_mask_2]).tolist()
@@ -120,8 +124,10 @@ def compute_biophysical_stats(cif_path: Path) -> Tuple[List[dict], Dict[str, Lis
             interface_residues_map[c2].update(res_ids_2)
 
             print(
-                f"[BIOPHYS] Pair {c1}-{c2}: MinDist={min_dist_global:.2f}A, BSA={bsa_val:.1f}, IF_Res={len(res_ids_1)}/{len(res_ids_2)}",
-                flush=True)
+                f"[BIOPHYS] Pair {c1}-{c2}: MinDist={min_dist_global:.2f}A, BSA={bsa_val:.1f}, "
+                f"H-Bonds={num_h_bonds}, Salt={num_salt}, IF_Res={len(res_ids_1)}/{len(res_ids_2)}",
+                flush=True
+            )
 
             pair_stats.append({
                 "chain1": c1,
@@ -184,8 +190,9 @@ def get_interface_motif(cif_path: Path, threshold: float = None) -> str:
 
             dists = cdist(atoms1.coord, atoms2.coord)
 
-            mask_1 = dists.min(axis=1) < threshold
-            mask_2 = dists.min(axis=0) < threshold
+            # Using <= for consistency with the main computation function
+            mask_1 = dists.min(axis=1) <= threshold
+            mask_2 = dists.min(axis=0) <= threshold
 
             res_ids_1 = np.unique(atoms1.res_id[mask_1])
             for rid in res_ids_1:
