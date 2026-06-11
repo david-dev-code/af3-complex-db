@@ -103,12 +103,12 @@ def _organism_rank(org: str | None) -> int:
 
 def _determine_best_entry(chain: models.Chain) -> tuple[str | None, str | None, str | None]:
     """
-    Determines the "best" UniProt accession for a chain in auto-mode.
-    Logic priority:
-    1. Most frequent protein name among associated accessions.
-    2. 'Reviewed' status preferred.
-    3. Organism ranking.
-    4. Alphabetical sort.
+    Determines the best UniProt accession for a chain in auto-mode.
+    Priority:
+    1. 'Reviewed' (Swiss-Prot) status over unreviewed (TrEMBL).
+    2. Most frequent protein name within the selected status group.
+    3. Organism ranking (e.g., Human > Mouse).
+    4. Alphabetical sort of the accession ID.
 
     Returns: (primary_accession, protein_name, gene_name)
     """
@@ -117,25 +117,27 @@ def _determine_best_entry(chain: models.Chain) -> tuple[str | None, str | None, 
 
     entries = chain.uniparc.accessions
 
-    # Count frequency of protein names
+    reviewed_entries = [ua for ua in entries if ua.status and REVIEWED_FLAG in ua.status]
+    pool = reviewed_entries if reviewed_entries else entries
+
     name_counts = Counter()
-    for ua in entries:
+    for ua in pool:
         if ua.protein_name:
             name_counts[ua.protein_name] += 1
 
     if not name_counts:
-        # Fallback to the first available (preferring reviewed)
-        best = sorted(entries, key=lambda x: (0 if x.status and REVIEWED_FLAG in x.status else 1, x.accession))[0]
+        def fallback_rank(ua):
+            return (_organism_rank(ua.organism), ua.accession)
+
+        best = sorted(pool, key=fallback_rank)[0]
         return best.accession, best.protein_name, best.gene_name
 
     max_freq = max(name_counts.values())
     candidate_names = {n for n, c in name_counts.items() if c == max_freq}
-    candidates = [ua for ua in entries if ua.protein_name in candidate_names]
+    candidates = [ua for ua in pool if ua.protein_name in candidate_names]
 
     def rank_key(ua):
-        is_reviewed = 0 if (ua.status and REVIEWED_FLAG in ua.status) else 1
-        org_r = _organism_rank(ua.organism)
-        return (is_reviewed, org_r, ua.accession)
+        return (_organism_rank(ua.organism), ua.accession)
 
     best_ua = sorted(candidates, key=rank_key)[0]
     return best_ua.accession, best_ua.protein_name, best_ua.gene_name
