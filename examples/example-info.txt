@@ -1,0 +1,11 @@
+This folder contains two example protein complexes modeled using the AlphaFold Server (https://alphafoldserver.com/).
+
+P69905_P68871.zip: Hemoglobin subunit alpha (Uniprot: P69905) and Hemoglobin subunit beta (Uniprot: P68871)
+
+and
+
+Q15116_Q9NZQ7.zip: Programmed cell death protein 1 (Uniprot: Q15116) and Programmed cell death 1 ligand 1 (Uniprot: Q9NZQ7)
+
+
+
+This sample data is subject to the AlphaFold3 Output Terms of Use / license.
