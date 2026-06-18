@@ -5,9 +5,9 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 AF3-Complex-DB is a (local) web server and database designed for the management, 
-storage, and analysis of AlphaFold 3 predicted protein complexes and their interactions. 
+storage, and analysis of AlphaFold3 predicted protein complexes and their interactions. 
 
-It provides an intuitive web interface and a powerful Command Line Interface (CLI) to ingest raw AlphaFold 3 outputs, automatically calculate biophysical metrics, map sequences to UniProt, and query the resulting dataset efficiently.
+It provides an intuitive web interface and a powerful Command Line Interface (CLI) to ingest raw AlphaFold3 outputs, automatically calculate biophysical metrics, map sequences to UniProt, and query the resulting dataset efficiently.
 
 
 ---
@@ -57,7 +57,7 @@ af3-db logs db -n 500   # Shows the last 500 lines of the database logs
 ```
 
 ### 2. Uploading Data
-The `upload-folder` command is the workhorse of AF3-Complex-DB. It recursively scans a directory for AlphaFold 3 outputs and `.zip`/`.tar` archives.
+The `upload-folder` command is the workhorse of AF3-Complex-DB. It recursively scans a directory for AlphaFold3 outputs and `.zip`/`.tar` archives.
 
 **Standard Upload:**
 ```bash
@@ -111,11 +111,18 @@ Clicking on an Accession ID (e.g., `AF-CP-00012`) opens the detailed view:
 
 ---
 
+## 📚 DOCUMENTATION & WIKI
+
+For more details, screenshots and other informations, please visit the Wiki.
+👉 **[Read the AF3-Complex-DB Wiki](https://github.com/david-dev-code/af3-complex-db/wiki)**
+
+---
+
 ## 🛡️ LICENSE & DISCLAIMER
 
 AF3-Complex-DB is an independent, open-source tool developed for research and analytical purposes. It is not affiliated with, endorsed by, or sponsored by Google DeepMind.
 
-Please respect the respective licensing terms of AlphaFold 3 and UniProt when utilizing the predictions and metadata.
+Please respect the respective licensing terms of AlphaFold3 and UniProt when utilizing the predictions and metadata.
 
 ---
 
